@@ -663,8 +663,8 @@
     }
     
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 1; }
+      to { opacity: 1; }
     }
     
     /* ========== カードスタイル ========== */
@@ -965,25 +965,10 @@
       }
     }
     
-    /* ========== アニメーション ========== */
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    
+    /* ========== アニメーション（無効化） ========== */
     .hikari-animate-slide-up {
-      animation: slideUp 0.6s ease forwards;
+      /* アニメーションなし - 即座に表示 */
     }
-    
-    .hikari-animate-delay-1 { animation-delay: 0.1s; }
-    .hikari-animate-delay-2 { animation-delay: 0.2s; }
-    .hikari-animate-delay-3 { animation-delay: 0.3s; }
-    .hikari-animate-delay-4 { animation-delay: 0.4s; }
     
     /* ========== マップ（Googleマップ風） ========== */
     .hikari-map-viewport {
@@ -1181,3 +1166,49 @@
   `;
 
 })(window.HIKARI = window.HIKARI || {});
+
+// ========================================
+//  即座にスタイル適用（ちらつき防止）
+// ========================================
+(function() {
+  'use strict';
+  
+  // 既に追加済みならスキップ
+  if (document.getElementById('hikari-instant-style')) return;
+  
+  const style = document.createElement('style');
+  style.id = 'hikari-instant-style';
+  style.textContent = `
+    /* kintone標準UIを即座に非表示 */
+    #portal-header,
+    .gaia-header,
+    .gaia-header-toolbar,
+    .gaia-argoui-portal-header,
+    .gaia-argoui-portal-content,
+    .gaia-argoui-portal-nav,
+    .gaia-argoui-portal-announcement,
+    .gaia-argoui-portal-space,
+    .gaia-argoui-portal-appshortcuts,
+    .gaia-argoui-portal-notifications,
+    .ocean-portal-header,
+    .ocean-portal-content,
+    .ocean-portal-main,
+    .gaia-argoui-portal {
+      display: none !important;
+      visibility: hidden !important;
+    }
+    
+    body {
+      background: #0a0a0a !important;
+    }
+  `;
+  
+  // head の最初に追加（最優先で適用）
+  if (document.head) {
+    document.head.insertBefore(style, document.head.firstChild);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.head.insertBefore(style, document.head.firstChild);
+    });
+  }
+})();
