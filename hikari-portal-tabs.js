@@ -766,11 +766,14 @@
         <div class="hikari-minimap" id="minimap" data-map-size="${mapSize}">
           <!-- ミニマップ上のバブル点 -->
           ${bubbles.map(item => `
-            <div class="hikari-minimap-dot" style="
-              left: ${(item.x / mapSize) * 100}%;
-              top: ${(item.y / mapSize) * 100}%;
-              background: ${item.color};
-            "></div>
+            <div class="hikari-minimap-dot" 
+                 data-original-x="${item.x}"
+                 data-original-y="${item.y}"
+                 style="
+                   left: ${(item.x / mapSize) * 100}%;
+                   top: ${(item.y / mapSize) * 100}%;
+                   background: ${item.color};
+                 "></div>
           `).join('')}
           <div class="hikari-minimap-viewport" id="minimap-viewport"></div>
         </div>
@@ -931,6 +934,27 @@
       centerMap();
     };
     
+    // ミニマップのドットを更新
+    const updateMinimapDots = () => {
+      const minimapWidth = minimapEl.clientWidth;
+      const minimapHeight = minimapEl.clientHeight;
+      const scaledCanvasWidth = mapSize * scale;
+      const scaledCanvasHeight = mapSize * scale;
+      
+      minimapEl.querySelectorAll('.hikari-minimap-dot').forEach(dot => {
+        const originalX = parseFloat(dot.dataset.originalX);
+        const originalY = parseFloat(dot.dataset.originalY);
+        
+        // スケール適用後の位置を計算
+        const scaledX = originalX * scale;
+        const scaledY = originalY * scale;
+        
+        // ミニマップ上の位置（%）
+        dot.style.left = (scaledX / scaledCanvasWidth * 100) + '%';
+        dot.style.top = (scaledY / scaledCanvasHeight * 100) + '%';
+      });
+    };
+    
     // ミニマップ更新
     const updateMinimap = () => {
       if (!minimapViewport || !minimapEl) return;
@@ -939,25 +963,29 @@
       const minimapWidth = minimapEl.clientWidth;
       const minimapHeight = minimapEl.clientHeight;
       
-      // 現在のビューポートの表示範囲を「元のマップサイズ」基準で計算
-      const viewLeftInCanvas = viewport.scrollLeft / scale;
-      const viewTopInCanvas = viewport.scrollTop / scale;
-      const viewWidthInCanvas = viewport.clientWidth / scale;
-      const viewHeightInCanvas = viewport.clientHeight / scale;
+      // スケール適用後のキャンバスサイズ
+      const scaledCanvasWidth = mapSize * scale;
+      const scaledCanvasHeight = mapSize * scale;
       
-      // 元のマップサイズに対するミニマップの縮小率
-      const ratioX = minimapWidth / mapSize;
-      const ratioY = minimapHeight / mapSize;
+      // 現在の表示範囲（スケール適用後の座標）
+      const scrollL = Math.max(0, viewport.scrollLeft);
+      const scrollT = Math.max(0, viewport.scrollTop);
+      const viewW = viewport.clientWidth;
+      const viewH = viewport.clientHeight;
+      
+      // スケール適用後のキャンバスに対するミニマップの縮小率
+      const ratioX = minimapWidth / scaledCanvasWidth;
+      const ratioY = minimapHeight / scaledCanvasHeight;
       
       // ミニマップ上のビューポート位置・サイズ
-      let vpWidth = viewWidthInCanvas * ratioX;
-      let vpHeight = viewHeightInCanvas * ratioY;
-      let vpLeft = viewLeftInCanvas * ratioX;
-      let vpTop = viewTopInCanvas * ratioY;
+      let vpWidth = viewW * ratioX;
+      let vpHeight = viewH * ratioY;
+      let vpLeft = scrollL * ratioX;
+      let vpTop = scrollT * ratioY;
       
-      // 範囲制限
-      vpWidth = Math.min(vpWidth, minimapWidth);
-      vpHeight = Math.min(vpHeight, minimapHeight);
+      // 最小サイズ
+      vpWidth = Math.max(10, Math.min(vpWidth, minimapWidth));
+      vpHeight = Math.max(10, Math.min(vpHeight, minimapHeight));
       vpLeft = Math.max(0, Math.min(vpLeft, minimapWidth - vpWidth));
       vpTop = Math.max(0, Math.min(vpTop, minimapHeight - vpHeight));
       
@@ -965,6 +993,9 @@
       minimapViewport.style.height = vpHeight + 'px';
       minimapViewport.style.left = vpLeft + 'px';
       minimapViewport.style.top = vpTop + 'px';
+      
+      // ドットも更新
+      updateMinimapDots();
     };
     
     // ========== イベントハンドラ ==========
@@ -1098,20 +1129,20 @@
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
       
-      // ミニマップ上のクリック位置→元のマップサイズ基準の位置
       const minimapWidth = minimapEl.clientWidth;
       const minimapHeight = minimapEl.clientHeight;
       
-      const canvasX = (clickX / minimapWidth) * mapSize;
-      const canvasY = (clickY / minimapHeight) * mapSize;
+      // スケール適用後のキャンバスサイズ
+      const scaledCanvasWidth = mapSize * scale;
+      const scaledCanvasHeight = mapSize * scale;
       
-      // スケール適用後のスクロール位置に変換
-      const targetX = canvasX * scale - viewport.clientWidth / 2;
-      const targetY = canvasY * scale - viewport.clientHeight / 2;
+      // ミニマップ上のクリック位置→スケール適用後のキャンバス位置
+      const targetX = (clickX / minimapWidth) * scaledCanvasWidth - viewport.clientWidth / 2;
+      const targetY = (clickY / minimapHeight) * scaledCanvasHeight - viewport.clientHeight / 2;
       
       viewport.scrollTo({
-        left: targetX,
-        top: targetY,
+        left: Math.max(0, targetX),
+        top: Math.max(0, targetY),
         behavior: 'smooth'
       });
     });
