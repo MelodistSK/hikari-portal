@@ -806,7 +806,7 @@
       const color = Utils.getRelationshipColor(relationship);
       
       const photoUrl = photo && photo.length > 0 ? 
-        `/k/v1/file.json?fileKey=${photo[0].fileKey}` : '';
+        `/k/api/blob/download.do?fileKey=${photo[0].fileKey}` : '';
       
       return `
         <div class="hikari-person-card" data-record-id="${id}" style="--relationship-color: ${color}">
@@ -868,7 +868,7 @@
     const color = Utils.getRelationshipColor(relationship);
     
     const photoUrl = photo && photo.length > 0 ? 
-      `/k/v1/file.json?fileKey=${photo[0].fileKey}` : '';
+      `/k/api/blob/download.do?fileKey=${photo[0].fileKey}` : '';
     
     const modal = document.createElement('div');
     modal.className = 'hikari-modal-overlay';
@@ -1017,7 +1017,7 @@
     const getVal = (field) => record ? Utils.getFieldValue(record, field) : '';
     const photo = record ? Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO) : [];
     const photoUrl = photo && photo.length > 0 ? 
-      `/k/v1/file.json?fileKey=${photo[0].fileKey}` : '';
+      `/k/api/blob/download.do?fileKey=${photo[0].fileKey}` : '';
     
     const modal = document.createElement('div');
     modal.className = 'hikari-modal-overlay';
