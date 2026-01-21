@@ -762,22 +762,6 @@
           </div>
         </div>
         
-        <!-- ミニマップ -->
-        <div class="hikari-minimap" id="minimap" data-map-size="${mapSize}">
-          <!-- ミニマップ上のバブル点 -->
-          ${bubbles.map(item => `
-            <div class="hikari-minimap-dot" 
-                 data-original-x="${item.x}"
-                 data-original-y="${item.y}"
-                 style="
-                   left: ${(item.x / mapSize) * 100}%;
-                   top: ${(item.y / mapSize) * 100}%;
-                   background: ${item.color};
-                 "></div>
-          `).join('')}
-          <div class="hikari-minimap-viewport" id="minimap-viewport"></div>
-        </div>
-        
         <!-- ツールチップ -->
         <div class="hikari-map-tooltip" id="map-tooltip"></div>
       </div>
@@ -827,8 +811,6 @@
   HIKARI.initMap = () => {
     const viewport = document.getElementById('map-viewport');
     const canvas = document.getElementById('map-canvas');
-    const minimapEl = document.getElementById('minimap');
-    const minimapViewport = document.getElementById('minimap-viewport');
     const zoomLevelEl = document.getElementById('zoom-level');
     const tooltip = document.getElementById('map-tooltip');
     
@@ -913,7 +895,7 @@
       
       // UI更新
       zoomLevelEl.textContent = Math.round(scale * 100) + '%';
-      updateMinimap();
+      
     };
     
     // 中央に移動
@@ -922,7 +904,7 @@
       const scaledHeight = mapSize * scale;
       viewport.scrollLeft = (scaledWidth - viewport.clientWidth) / 2;
       viewport.scrollTop = (scaledHeight - viewport.clientHeight) / 2;
-      updateMinimap();
+      
     };
     
     // 全体表示
@@ -932,70 +914,6 @@
       const fitScale = Math.min(viewportWidth / mapSize, viewportHeight / mapSize) * 0.85;
       setScale(fitScale);
       centerMap();
-    };
-    
-    // ミニマップのドットを更新
-    const updateMinimapDots = () => {
-      const minimapWidth = minimapEl.clientWidth;
-      const minimapHeight = minimapEl.clientHeight;
-      const scaledCanvasWidth = mapSize * scale;
-      const scaledCanvasHeight = mapSize * scale;
-      
-      minimapEl.querySelectorAll('.hikari-minimap-dot').forEach(dot => {
-        const originalX = parseFloat(dot.dataset.originalX);
-        const originalY = parseFloat(dot.dataset.originalY);
-        
-        // スケール適用後の位置を計算
-        const scaledX = originalX * scale;
-        const scaledY = originalY * scale;
-        
-        // ミニマップ上の位置（%）
-        dot.style.left = (scaledX / scaledCanvasWidth * 100) + '%';
-        dot.style.top = (scaledY / scaledCanvasHeight * 100) + '%';
-      });
-    };
-    
-    // ミニマップ更新
-    const updateMinimap = () => {
-      if (!minimapViewport || !minimapEl) return;
-      
-      // ミニマップのサイズ
-      const minimapWidth = minimapEl.clientWidth;
-      const minimapHeight = minimapEl.clientHeight;
-      
-      // スケール適用後のキャンバスサイズ
-      const scaledCanvasWidth = mapSize * scale;
-      const scaledCanvasHeight = mapSize * scale;
-      
-      // 現在の表示範囲（スケール適用後の座標）
-      const scrollL = Math.max(0, viewport.scrollLeft);
-      const scrollT = Math.max(0, viewport.scrollTop);
-      const viewW = viewport.clientWidth;
-      const viewH = viewport.clientHeight;
-      
-      // スケール適用後のキャンバスに対するミニマップの縮小率
-      const ratioX = minimapWidth / scaledCanvasWidth;
-      const ratioY = minimapHeight / scaledCanvasHeight;
-      
-      // ミニマップ上のビューポート位置・サイズ
-      let vpWidth = viewW * ratioX;
-      let vpHeight = viewH * ratioY;
-      let vpLeft = scrollL * ratioX;
-      let vpTop = scrollT * ratioY;
-      
-      // 最小サイズ
-      vpWidth = Math.max(10, Math.min(vpWidth, minimapWidth));
-      vpHeight = Math.max(10, Math.min(vpHeight, minimapHeight));
-      vpLeft = Math.max(0, Math.min(vpLeft, minimapWidth - vpWidth));
-      vpTop = Math.max(0, Math.min(vpTop, minimapHeight - vpHeight));
-      
-      minimapViewport.style.width = vpWidth + 'px';
-      minimapViewport.style.height = vpHeight + 'px';
-      minimapViewport.style.left = vpLeft + 'px';
-      minimapViewport.style.top = vpTop + 'px';
-      
-      // ドットも更新
-      updateMinimapDots();
     };
     
     // ========== イベントハンドラ ==========
@@ -1029,7 +947,7 @@
       viewport.scrollLeft = scrollStartX + deltaX;
       viewport.scrollTop = scrollStartY + deltaY;
       
-      updateMinimap();
+      
       e.preventDefault();
     };
     
@@ -1119,33 +1037,6 @@
     });
     document.getElementById('map-fit')?.addEventListener('click', fitAll);
     document.getElementById('map-center')?.addEventListener('click', centerMap);
-    
-    // スクロールイベント
-    viewport.addEventListener('scroll', updateMinimap);
-    
-    // ミニマップクリックで移動
-    minimapEl?.addEventListener('click', (e) => {
-      const rect = minimapEl.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      
-      const minimapWidth = minimapEl.clientWidth;
-      const minimapHeight = minimapEl.clientHeight;
-      
-      // スケール適用後のキャンバスサイズ
-      const scaledCanvasWidth = mapSize * scale;
-      const scaledCanvasHeight = mapSize * scale;
-      
-      // ミニマップ上のクリック位置→スケール適用後のキャンバス位置
-      const targetX = (clickX / minimapWidth) * scaledCanvasWidth - viewport.clientWidth / 2;
-      const targetY = (clickY / minimapHeight) * scaledCanvasHeight - viewport.clientHeight / 2;
-      
-      viewport.scrollTo({
-        left: Math.max(0, targetX),
-        top: Math.max(0, targetY),
-        behavior: 'smooth'
-      });
-    });
     
     // ========== 初期化 ==========
     
