@@ -935,23 +935,25 @@
     const updateMinimap = () => {
       if (!minimapViewport || !minimapEl) return;
       
-      // スケール適用後のキャンバスサイズ
-      const canvasWidth = mapSize * scale;
-      const canvasHeight = mapSize * scale;
-      
       // ミニマップのサイズ
       const minimapWidth = minimapEl.clientWidth;
       const minimapHeight = minimapEl.clientHeight;
       
-      // キャンバス→ミニマップの縮小率
-      const ratioX = minimapWidth / canvasWidth;
-      const ratioY = minimapHeight / canvasHeight;
+      // 現在のビューポートの表示範囲を「元のマップサイズ」基準で計算
+      const viewLeftInCanvas = viewport.scrollLeft / scale;
+      const viewTopInCanvas = viewport.scrollTop / scale;
+      const viewWidthInCanvas = viewport.clientWidth / scale;
+      const viewHeightInCanvas = viewport.clientHeight / scale;
       
-      // ビューポートの表示範囲をミニマップ上に反映
-      let vpWidth = viewport.clientWidth * ratioX;
-      let vpHeight = viewport.clientHeight * ratioY;
-      let vpLeft = viewport.scrollLeft * ratioX;
-      let vpTop = viewport.scrollTop * ratioY;
+      // 元のマップサイズに対するミニマップの縮小率
+      const ratioX = minimapWidth / mapSize;
+      const ratioY = minimapHeight / mapSize;
+      
+      // ミニマップ上のビューポート位置・サイズ
+      let vpWidth = viewWidthInCanvas * ratioX;
+      let vpHeight = viewHeightInCanvas * ratioY;
+      let vpLeft = viewLeftInCanvas * ratioX;
+      let vpTop = viewTopInCanvas * ratioY;
       
       // 範囲制限
       vpWidth = Math.min(vpWidth, minimapWidth);
@@ -1096,14 +1098,16 @@
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
       
-      // ミニマップ上のクリック位置→キャンバス上の位置
+      // ミニマップ上のクリック位置→元のマップサイズ基準の位置
       const minimapWidth = minimapEl.clientWidth;
       const minimapHeight = minimapEl.clientHeight;
-      const canvasWidth = mapSize * scale;
-      const canvasHeight = mapSize * scale;
       
-      const targetX = (clickX / minimapWidth) * canvasWidth - viewport.clientWidth / 2;
-      const targetY = (clickY / minimapHeight) * canvasHeight - viewport.clientHeight / 2;
+      const canvasX = (clickX / minimapWidth) * mapSize;
+      const canvasY = (clickY / minimapHeight) * mapSize;
+      
+      // スケール適用後のスクロール位置に変換
+      const targetX = canvasX * scale - viewport.clientWidth / 2;
+      const targetY = canvasY * scale - viewport.clientHeight / 2;
       
       viewport.scrollTo({
         left: targetX,
