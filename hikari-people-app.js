@@ -1184,17 +1184,27 @@
           const fileFormData = new FormData();
           fileFormData.append('file', selectedFile, selectedFile.name);
           
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', '/k/v1/file.json', false); // 同期リクエスト
-          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-          xhr.send(fileFormData);
+          // kintone.api.url()を使って正しいURLを取得
+          const uploadUrl = kintone.api.url('/k/v1/file', true);
           
-          if (xhr.status === 200) {
-            const uploadResult = JSON.parse(xhr.responseText);
-            data[CONFIG.FIELDS.PHOTO] = { value: [{ fileKey: uploadResult.fileKey }] };
-          } else {
-            throw new Error('ファイルアップロードに失敗しました');
-          }
+          const uploadResult = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadUrl);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.onload = function() {
+              if (xhr.status === 200) {
+                resolve(JSON.parse(xhr.responseText));
+              } else {
+                reject(new Error('ファイルアップロードに失敗しました: ' + xhr.status));
+              }
+            };
+            xhr.onerror = function() {
+              reject(new Error('ネットワークエラー'));
+            };
+            xhr.send(fileFormData);
+          });
+          
+          data[CONFIG.FIELDS.PHOTO] = { value: [{ fileKey: uploadResult.fileKey }] };
         }
         
         if (isNew) {
