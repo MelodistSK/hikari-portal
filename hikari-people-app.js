@@ -134,8 +134,20 @@
     showPhotoModal: async (fileKey) => {
       if (!fileKey) return;
       
-      const url = await Utils.getFileUrl(fileKey);
-      if (!url) return;
+      // 拡大表示用に新しくBlobURLを取得（キャッシュとは別）
+      let url;
+      try {
+        const apiUrl = kintone.api.url('/k/v1/file', true) + '?fileKey=' + fileKey;
+        const resp = await fetch(apiUrl, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!resp.ok) return;
+        const blob = await resp.blob();
+        url = URL.createObjectURL(blob);
+      } catch (e) {
+        console.error('写真取得エラー:', e);
+        return;
+      }
       
       const modal = document.createElement('div');
       modal.className = 'hikari-photo-modal';
@@ -154,7 +166,7 @@
         modal.classList.remove('active');
         setTimeout(() => {
           modal.remove();
-          URL.revokeObjectURL(url); // メモリ解放
+          URL.revokeObjectURL(url); // この拡大用URLだけ解放
         }, 300);
         // イベントリスナー削除
         document.removeEventListener('keydown', handleKey);
