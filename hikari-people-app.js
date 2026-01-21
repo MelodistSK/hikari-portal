@@ -100,6 +100,23 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
     },
+    
+    // 添付ファイルのBlobURLを取得
+    getFileUrl: async (fileKey) => {
+      if (!fileKey) return null;
+      try {
+        const url = kintone.api.url('/k/v1/file', true) + '?fileKey=' + fileKey;
+        const resp = await fetch(url, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!resp.ok) return null;
+        const blob = await resp.blob();
+        return URL.createObjectURL(blob);
+      } catch (e) {
+        console.error('ファイル取得エラー:', e);
+        return null;
+      }
+    },
   };
 
   // ========================================
@@ -805,13 +822,13 @@
       const photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
       const color = Utils.getRelationshipColor(relationship);
       
-      const photoUrl = photo && photo.length > 0 ? 
-        `/k/api/blob/download.do?fileKey=${photo[0].fileKey}` : '';
+      const hasPhoto = photo && photo.length > 0;
+      const fileKey = hasPhoto ? photo[0].fileKey : '';
       
       return `
         <div class="hikari-person-card" data-record-id="${id}" style="--relationship-color: ${color}">
           <div class="hikari-card-top">
-            <div class="hikari-card-avatar" style="background: ${color}; ${photoUrl ? `background-image: url('${photoUrl}'); color: transparent;` : ''}">
+            <div class="hikari-card-avatar" data-file-key="${fileKey}" style="background: ${color};">
               ${Utils.getInitial(name)}
             </div>
             <div class="hikari-card-info">
@@ -840,13 +857,27 @@
         }
       });
     });
+    
+    // 写真を非同期で読み込み
+    grid.querySelectorAll('.hikari-card-avatar[data-file-key]').forEach(async (avatar) => {
+      const fileKey = avatar.dataset.fileKey;
+      if (fileKey) {
+        const url = await Utils.getFileUrl(fileKey);
+        if (url) {
+          avatar.style.backgroundImage = `url('${url}')`;
+          avatar.style.backgroundSize = 'cover';
+          avatar.style.backgroundPosition = 'center';
+          avatar.style.color = 'transparent';
+        }
+      }
+    });
   };
 
   // ========================================
   //  詳細モーダル
   // ========================================
   
-  const showDetailModal = (record) => {
+  const showDetailModal = async (record) => {
     const id = Utils.getFieldValue(record, '$id');
     const name = Utils.getFieldValue(record, CONFIG.FIELDS.NAME);
     const kana = Utils.getFieldValue(record, CONFIG.FIELDS.KANA_NAME);
@@ -867,8 +898,8 @@
     const photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
     const color = Utils.getRelationshipColor(relationship);
     
-    const photoUrl = photo && photo.length > 0 ? 
-      `/k/api/blob/download.do?fileKey=${photo[0].fileKey}` : '';
+    const hasPhoto = photo && photo.length > 0;
+    const fileKey = hasPhoto ? photo[0].fileKey : '';
     
     const modal = document.createElement('div');
     modal.className = 'hikari-modal-overlay';
@@ -880,7 +911,7 @@
         </div>
         <div class="hikari-modal-body">
           <div class="hikari-detail-top">
-            <div class="hikari-detail-avatar" style="background: ${color}; ${photoUrl ? `background-image: url('${photoUrl}'); color: transparent;` : ''}" >
+            <div class="hikari-detail-avatar" id="detail-avatar" data-file-key="${fileKey}" style="background: ${color};">
               ${Utils.getInitial(name)}
             </div>
             <div class="hikari-detail-main">
@@ -1004,6 +1035,21 @@
     modal.querySelector('#hikari-btn-kintone').addEventListener('click', () => {
       window.open(`/k/${CONFIG.APP_ID}/show#record=${id}`, '_blank');
     });
+    
+    // 写真を非同期で読み込み
+    if (fileKey) {
+      Utils.getFileUrl(fileKey).then(url => {
+        if (url) {
+          const avatar = modal.querySelector('#detail-avatar');
+          if (avatar) {
+            avatar.style.backgroundImage = `url('${url}')`;
+            avatar.style.backgroundSize = 'cover';
+            avatar.style.backgroundPosition = 'center';
+            avatar.style.color = 'transparent';
+          }
+        }
+      });
+    }
   };
 
   // ========================================
@@ -1016,8 +1062,8 @@
     
     const getVal = (field) => record ? Utils.getFieldValue(record, field) : '';
     const photo = record ? Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO) : [];
-    const photoUrl = photo && photo.length > 0 ? 
-      `/k/api/blob/download.do?fileKey=${photo[0].fileKey}` : '';
+    const hasPhoto = photo && photo.length > 0;
+    const fileKey = hasPhoto ? photo[0].fileKey : '';
     
     const modal = document.createElement('div');
     modal.className = 'hikari-modal-overlay';
@@ -1030,7 +1076,7 @@
         <div class="hikari-modal-body">
           <form id="hikari-edit-form">
             <div class="hikari-form-group" style="text-align: center;">
-              <div class="hikari-form-photo-preview" id="photo-preview" style="${photoUrl ? `background-image: url('${photoUrl}')` : ''}">${photoUrl ? '' : '📷'}</div>
+              <div class="hikari-form-photo-preview" id="photo-preview" data-file-key="${fileKey}">${hasPhoto ? '' : '📷'}</div>
               <input type="file" id="photo-input" accept="image/*" style="display: none;">
               <button type="button" class="hikari-btn hikari-btn-secondary" id="photo-btn" style="font-size: 0.85rem; padding: 8px 15px;">写真を選択</button>
             </div>
@@ -1165,6 +1211,16 @@
         reader.readAsDataURL(file);
       }
     });
+    
+    // 既存写真を非同期で読み込み
+    if (fileKey) {
+      Utils.getFileUrl(fileKey).then(url => {
+        if (url && photoPreview) {
+          photoPreview.style.backgroundImage = `url('${url}')`;
+          photoPreview.textContent = '';
+        }
+      });
+    }
     
     // フォーム送信
     modal.querySelector('#hikari-edit-form').addEventListener('submit', async (e) => {
