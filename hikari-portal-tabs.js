@@ -641,8 +641,9 @@
     `;
   };
 
+
   // ========================================
-  //  🔮 人脈マップタブ
+  //  🔮 人脈マップタブ（シンプル版）
   // ========================================
   
   HIKARI.tabs.renderMap = () => {
@@ -654,14 +655,13 @@
       const name = HIKARI.utils.getFieldValue(record, HIKARI.CONFIG.PEOPLE_FIELDS.NAME) || '';
       const company = HIKARI.utils.getFieldValue(record, HIKARI.CONFIG.PEOPLE_FIELDS.COMPANY) || '';
       const relationship = HIKARI.utils.getFieldValue(record, HIKARI.CONFIG.PEOPLE_FIELDS.RELATIONSHIP);
-      const referrerId = HIKARI.utils.getFieldValue(record, HIKARI.CONFIG.PEOPLE_FIELDS.REFERRER_ID);
       const referralCount = referralAggregation[id]?.count || 0;
       const score = HIKARI.utils.calculateScore(record, referralCount);
       const level = HIKARI.utils.getRelationshipLevel(relationship);
       const color = HIKARI.CONFIG.RELATIONSHIP_COLORS[level] || '#666';
       const contactCount = HIKARI.utils.getFieldValue(record, HIKARI.CONFIG.PEOPLE_FIELDS.CONTACT_COUNT) || 0;
       
-      return { id, name, company, score, color, level, referralCount, contactCount, referrerId, record };
+      return { id, name, company, score, color, level, referralCount, contactCount, record };
     });
     
     // スコア順にソート
@@ -669,38 +669,28 @@
     const totalPeople = sortedRecords.length;
     const maxScore = sortedRecords.length > 0 ? Math.max(...sortedRecords.map(r => r.score)) : 1;
     
-    // マップサイズ計算（人数に応じて拡大）
-    const mapSize = Math.max(2000, Math.ceil(Math.sqrt(totalPeople)) * 250);
+    // マップサイズ（固定）
+    const mapSize = Math.max(1200, Math.ceil(Math.sqrt(totalPeople)) * 180);
+    const centerX = mapSize / 2;
+    const centerY = mapSize / 2;
     
-    // バブル配置を計算（スパイラル配置 - 中心から外側へ）
+    // バブル配置（スパイラル）
     const bubbles = sortedRecords.map((item, i) => {
-      const minRadius = 20;
-      const maxRadius = 60;
+      const minRadius = 25;
+      const maxRadius = 55;
       const radius = minRadius + (item.score / maxScore) * (maxRadius - minRadius);
-      
-      // スパイラル配置（重要な人ほど中心に）
       const angle = i * 0.7;
-      const distance = 100 + i * 12;
-      const centerX = mapSize / 2;
-      const centerY = mapSize / 2;
-      
+      const distance = 70 + i * 16;
       const x = centerX + Math.cos(angle) * distance;
       const y = centerY + Math.sin(angle) * distance;
-      
-      return {
-        ...item,
-        radius,
-        x,
-        y,
-      };
+      return { ...item, radius, x, y };
     });
     
-    // バブルのHTML生成
     const bubblesHtml = bubbles.map(item => `
       <div class="hikari-map-bubble" 
            data-record-id="${item.id}"
            data-name="${item.name}"
-           data-company="${item.company}"
+           data-company="${item.company || ''}"
            data-referral="${item.referralCount}"
            data-contact="${item.contactCount}"
            style="
@@ -709,7 +699,7 @@
              left: ${item.x - item.radius}px;
              top: ${item.y - item.radius}px;
              background: ${item.color};
-             font-size: ${Math.max(item.radius / 3, 10)}px;
+             font-size: ${Math.max(item.radius / 3, 11)}px;
            ">
         ${HIKARI.utils.getInitial(item.name)}
       </div>
@@ -720,54 +710,35 @@
         <h2 style="font-size: 2rem; font-weight: 300; color: #f7e7ce; margin-bottom: 10px;">
           人脈マップ
         </h2>
-        <p style="color: #666;">ドラッグで移動、ホイールでズーム（全${totalPeople}人）</p>
+        <p style="color: #666;">ドラッグで移動できます（全${totalPeople}人）</p>
       </div>
       
-      <!-- 凡例＆コントロール -->
-      <div class="hikari-card hikari-animate-slide-up" style="margin-bottom: 20px; opacity: 0;">
+      <div class="hikari-card" style="margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
           <div style="display: flex; gap: 20px; flex-wrap: wrap;">
             ${Object.entries(HIKARI.CONFIG.RELATIONSHIP_NAMES).map(([level, name]) => `
               <div style="display: flex; align-items: center; gap: 6px;">
-                <div style="
-                  width: 14px;
-                  height: 14px;
-                  border-radius: 50%;
-                  background: ${HIKARI.CONFIG.RELATIONSHIP_COLORS[level]};
-                "></div>
+                <div style="width: 14px; height: 14px; border-radius: 50%; background: ${HIKARI.CONFIG.RELATIONSHIP_COLORS[level]};"></div>
                 <span style="color: #888; font-size: 0.85rem;">${name}</span>
               </div>
             `).join('')}
           </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <button id="map-zoom-out" class="hikari-map-ctrl-btn" title="縮小">−</button>
-            <span id="zoom-level" style="color: #d4af37; font-weight: 500; min-width: 50px; text-align: center;">100%</span>
-            <button id="map-zoom-in" class="hikari-map-ctrl-btn" title="拡大">＋</button>
-            <button id="map-fit" class="hikari-map-ctrl-btn hikari-map-ctrl-btn-text" title="全体表示">全体</button>
-            <button id="map-center" class="hikari-map-ctrl-btn hikari-map-ctrl-btn-text" title="中心に戻る">中心</button>
-          </div>
+          <button id="map-center" class="hikari-map-ctrl-btn hikari-map-ctrl-btn-text">中心に戻る</button>
         </div>
       </div>
       
-      <!-- マップコンテナ -->
-      <div class="hikari-card hikari-animate-slide-up hikari-animate-delay-1" style="opacity: 0; padding: 0; overflow: hidden; position: relative;">
+      <div class="hikari-card" style="padding: 0; overflow: hidden; position: relative;">
         <div class="hikari-map-viewport" id="map-viewport" data-map-size="${mapSize}">
           <div class="hikari-map-canvas" id="map-canvas" style="width: ${mapSize}px; height: ${mapSize}px;">
-            <!-- グリッド背景 -->
             <div class="hikari-map-grid"></div>
-            <!-- バブル -->
             ${bubblesHtml}
-            <!-- 中心マーカー -->
-            <div class="hikari-map-center-marker" style="left: ${mapSize/2}px; top: ${mapSize/2}px;"></div>
+            <div class="hikari-map-center-marker" style="left: ${centerX}px; top: ${centerY}px;"></div>
           </div>
         </div>
-        
-        <!-- ツールチップ -->
         <div class="hikari-map-tooltip" id="map-tooltip"></div>
       </div>
       
-      <!-- スコア上位リスト -->
-      <div class="hikari-card hikari-animate-slide-up hikari-animate-delay-2" style="margin-top: 30px; opacity: 0;">
+      <div class="hikari-card" style="margin-top: 30px;">
         <div class="hikari-card-header">
           <span class="hikari-card-icon">⭐</span>
           <span class="hikari-card-title">重要度スコア TOP10</span>
@@ -776,25 +747,13 @@
           ${sortedRecords.slice(0, 10).map((item, i) => `
             <li class="hikari-list-item" data-record-id="${item.id}">
               <span class="hikari-rank ${i === 0 ? '' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'normal'}">${i + 1}</span>
-              <div style="
-                width: 40px;
-                height: 40px;
-                background: ${item.color};
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #0a0a0a;
-                font-weight: 700;
-              ">${HIKARI.utils.getInitial(item.name)}</div>
+              <div style="width: 40px; height: 40px; background: ${item.color}; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #0a0a0a; font-weight: 700;">${HIKARI.utils.getInitial(item.name)}</div>
               <div style="flex: 1;">
                 <div style="font-weight: 500;">${item.name}</div>
                 <div style="font-size: 0.85rem; color: #888;">${item.company}</div>
               </div>
               <div style="text-align: right;">
-                <div style="font-size: 1.2rem; font-weight: 700; color: #d4af37;">
-                  ${Math.round(item.score)}
-                </div>
+                <div style="font-size: 1.2rem; font-weight: 700; color: #d4af37;">${Math.round(item.score)}</div>
                 <div style="font-size: 0.75rem; color: #666;">スコア</div>
               </div>
             </li>
@@ -805,250 +764,107 @@
   };
   
   // ========================================
-  //  マップ初期化（タブ切り替え時に呼び出し）
+  //  マップ初期化（シンプル版）
   // ========================================
   
   HIKARI.initMap = () => {
     const viewport = document.getElementById('map-viewport');
     const canvas = document.getElementById('map-canvas');
-    const zoomLevelEl = document.getElementById('zoom-level');
     const tooltip = document.getElementById('map-tooltip');
     
-    if (!viewport || !canvas) {
-      console.error('Map elements not found');
-      return;
-    }
+    if (!viewport || !canvas) return;
     
-    // 設定
-    const mapSize = parseInt(viewport.dataset.mapSize) || 2000;
-    const minScale = 0.15;
-    const maxScale = 2.5;
-    const zoomStep = 0.08; // 8%ずつズーム（小刻み）
+    const mapSize = parseInt(viewport.dataset.mapSize) || 1200;
     
-    // 状態
-    let scale = 0.4;
+    // キャンバスサイズをビューポート以上に調整
+    const vpWidth = viewport.clientWidth;
+    const vpHeight = viewport.clientHeight;
+    const actualSize = Math.max(mapSize, vpWidth, vpHeight);
+    canvas.style.width = actualSize + 'px';
+    canvas.style.height = actualSize + 'px';
+    
     let isDragging = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let scrollStartX = 0;
-    let scrollStartY = 0;
-    
-    // ========== ユーティリティ ==========
-    
-    // スケールを適用（ビューポート中心を基準）
-    const setScale = (newScale, pivotX, pivotY) => {
-      // スケールを制限
-      newScale = Math.max(minScale, Math.min(maxScale, newScale));
-      
-      // ピボットポイント（デフォルトはビューポート中心）
-      if (pivotX === undefined) pivotX = viewport.clientWidth / 2;
-      if (pivotY === undefined) pivotY = viewport.clientHeight / 2;
-      
-      // ピボットに対応するキャンバス上の座標（スケール前）
-      const canvasX = (viewport.scrollLeft + pivotX) / scale;
-      const canvasY = (viewport.scrollTop + pivotY) / scale;
-      
-      // スケール更新
-      const oldScale = scale;
-      scale = newScale;
-      
-      // キャンバスサイズ更新
-      const scaledWidth = mapSize * scale;
-      const scaledHeight = mapSize * scale;
-      canvas.style.width = scaledWidth + 'px';
-      canvas.style.height = scaledHeight + 'px';
-      
-      // バブルのサイズと位置を更新
-      canvas.querySelectorAll('.hikari-map-bubble').forEach(bubble => {
-        const originalLeft = parseFloat(bubble.dataset.originalLeft || bubble.style.left);
-        const originalTop = parseFloat(bubble.dataset.originalTop || bubble.style.top);
-        const originalWidth = parseFloat(bubble.dataset.originalWidth || bubble.style.width);
-        const originalHeight = parseFloat(bubble.dataset.originalHeight || bubble.style.height);
-        const originalFontSize = parseFloat(bubble.dataset.originalFontSize || bubble.style.fontSize);
-        
-        // 初回のみ元の値を保存
-        if (!bubble.dataset.originalLeft) {
-          bubble.dataset.originalLeft = originalLeft;
-          bubble.dataset.originalTop = originalTop;
-          bubble.dataset.originalWidth = originalWidth;
-          bubble.dataset.originalHeight = originalHeight;
-          bubble.dataset.originalFontSize = originalFontSize;
-        }
-        
-        bubble.style.left = (parseFloat(bubble.dataset.originalLeft) * scale) + 'px';
-        bubble.style.top = (parseFloat(bubble.dataset.originalTop) * scale) + 'px';
-        bubble.style.width = (parseFloat(bubble.dataset.originalWidth) * scale) + 'px';
-        bubble.style.height = (parseFloat(bubble.dataset.originalHeight) * scale) + 'px';
-        bubble.style.fontSize = (parseFloat(bubble.dataset.originalFontSize) * scale) + 'px';
-      });
-      
-      // 中心マーカー更新
-      const centerMarker = canvas.querySelector('.hikari-map-center-marker');
-      if (centerMarker) {
-        centerMarker.style.left = (mapSize / 2 * scale) + 'px';
-        centerMarker.style.top = (mapSize / 2 * scale) + 'px';
-      }
-      
-      // スクロール位置調整（ピボットを維持）
-      viewport.scrollLeft = canvasX * scale - pivotX;
-      viewport.scrollTop = canvasY * scale - pivotY;
-      
-      // UI更新
-      zoomLevelEl.textContent = Math.round(scale * 100) + '%';
-      
-    };
+    let dragStartX = 0, dragStartY = 0, scrollStartX = 0, scrollStartY = 0;
     
     // 中央に移動
     const centerMap = () => {
-      const scaledWidth = mapSize * scale;
-      const scaledHeight = mapSize * scale;
-      viewport.scrollLeft = (scaledWidth - viewport.clientWidth) / 2;
-      viewport.scrollTop = (scaledHeight - viewport.clientHeight) / 2;
-      
+      viewport.scrollTo({
+        left: Math.max(0, (actualSize - vpWidth) / 2),
+        top: Math.max(0, (actualSize - vpHeight) / 2),
+        behavior: 'smooth'
+      });
     };
     
-    // 全体表示
-    const fitAll = () => {
-      const viewportWidth = viewport.clientWidth;
-      const viewportHeight = viewport.clientHeight;
-      const fitScale = Math.min(viewportWidth / mapSize, viewportHeight / mapSize) * 0.85;
-      setScale(fitScale);
-      centerMap();
-    };
-    
-    // ========== イベントハンドラ ==========
-    
-    // ドラッグ開始
-    const onDragStart = (e) => {
-      // バブル上では開始しない
+    // ドラッグ
+    viewport.addEventListener('mousedown', (e) => {
       if (e.target.classList.contains('hikari-map-bubble')) return;
-      
       isDragging = true;
       viewport.classList.add('dragging');
-      
-      dragStartX = e.clientX || e.touches?.[0]?.clientX || 0;
-      dragStartY = e.clientY || e.touches?.[0]?.clientY || 0;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
       scrollStartX = viewport.scrollLeft;
       scrollStartY = viewport.scrollTop;
-      
       e.preventDefault();
-    };
+    });
     
-    // ドラッグ中
-    const onDragMove = (e) => {
+    document.addEventListener('mousemove', (e) => {
       if (!isDragging) return;
-      
-      const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
-      const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
-      
-      const deltaX = dragStartX - clientX;
-      const deltaY = dragStartY - clientY;
-      
-      viewport.scrollLeft = scrollStartX + deltaX;
-      viewport.scrollTop = scrollStartY + deltaY;
-      
-      
-      e.preventDefault();
-    };
+      viewport.scrollLeft = scrollStartX + (dragStartX - e.clientX);
+      viewport.scrollTop = scrollStartY + (dragStartY - e.clientY);
+    });
     
-    // ドラッグ終了
-    const onDragEnd = () => {
+    document.addEventListener('mouseup', () => {
       isDragging = false;
       viewport.classList.remove('dragging');
-    };
-    
-    // マウスホイール
-    const onWheel = (e) => {
-      e.preventDefault();
-      
-      // マウス位置を取得
-      const rect = viewport.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      
-      // ズーム方向
-      const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
-      const newScale = scale * (1 + delta);
-      
-      setScale(newScale, mouseX, mouseY);
-    };
-    
-    // バブルホバー
-    const onBubbleEnter = (e) => {
-      const bubble = e.target;
-      const name = bubble.dataset.name;
-      const company = bubble.dataset.company;
-      const referral = bubble.dataset.referral;
-      const contact = bubble.dataset.contact;
-      
-      tooltip.innerHTML = `
-        <div style="font-weight: 700; margin-bottom: 5px;">${name}</div>
-        <div style="font-size: 0.85rem; color: #888; margin-bottom: 5px;">${company || ''}</div>
-        <div style="font-size: 0.8rem;">紹介: ${referral}人 / 接点: ${contact}回</div>
-      `;
-      
-      const rect = bubble.getBoundingClientRect();
-      const viewportRect = viewport.getBoundingClientRect();
-      
-      tooltip.style.left = (rect.left + rect.width / 2 - viewportRect.left) + 'px';
-      tooltip.style.top = (rect.top - viewportRect.top - 10) + 'px';
-      tooltip.classList.add('visible');
-    };
-    
-    const onBubbleLeave = () => {
-      tooltip.classList.remove('visible');
-    };
-    
-    const onBubbleClick = (e) => {
-      const recordId = e.target.dataset.recordId;
-      if (recordId) {
-        HIKARI.openPersonDetail(recordId);
-      }
-    };
-    
-    // ========== イベント登録 ==========
-    
-    // マウス
-    viewport.addEventListener('mousedown', onDragStart);
-    document.addEventListener('mousemove', onDragMove);
-    document.addEventListener('mouseup', onDragEnd);
+    });
     
     // タッチ
-    viewport.addEventListener('touchstart', onDragStart, { passive: false });
-    document.addEventListener('touchmove', onDragMove, { passive: false });
-    document.addEventListener('touchend', onDragEnd);
+    viewport.addEventListener('touchstart', (e) => {
+      if (e.target.classList.contains('hikari-map-bubble')) return;
+      isDragging = true;
+      dragStartX = e.touches[0].clientX;
+      dragStartY = e.touches[0].clientY;
+      scrollStartX = viewport.scrollLeft;
+      scrollStartY = viewport.scrollTop;
+    }, { passive: true });
     
-    // ホイール
-    viewport.addEventListener('wheel', onWheel, { passive: false });
+    document.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      viewport.scrollLeft = scrollStartX + (dragStartX - e.touches[0].clientX);
+      viewport.scrollTop = scrollStartY + (dragStartY - e.touches[0].clientY);
+    }, { passive: true });
+    
+    document.addEventListener('touchend', () => { isDragging = false; });
     
     // バブル
     canvas.querySelectorAll('.hikari-map-bubble').forEach(bubble => {
-      bubble.addEventListener('mouseenter', onBubbleEnter);
-      bubble.addEventListener('mouseleave', onBubbleLeave);
-      bubble.addEventListener('click', onBubbleClick);
+      bubble.addEventListener('mouseenter', (e) => {
+        const b = e.target;
+        tooltip.innerHTML = `
+          <div style="font-weight: 700; margin-bottom: 5px;">${b.dataset.name}</div>
+          ${b.dataset.company ? `<div style="font-size: 0.85rem; color: #888; margin-bottom: 5px;">${b.dataset.company}</div>` : ''}
+          <div style="font-size: 0.8rem;">紹介: ${b.dataset.referral}人 / 接点: ${b.dataset.contact}回</div>
+        `;
+        const rect = b.getBoundingClientRect();
+        const vpRect = viewport.getBoundingClientRect();
+        tooltip.style.left = (rect.left + rect.width / 2 - vpRect.left) + 'px';
+        tooltip.style.top = (rect.top - vpRect.top - 10) + 'px';
+        tooltip.classList.add('visible');
+      });
+      bubble.addEventListener('mouseleave', () => { tooltip.classList.remove('visible'); });
+      bubble.addEventListener('click', (e) => {
+        if (e.target.dataset.recordId) HIKARI.openPersonDetail(e.target.dataset.recordId);
+      });
     });
     
-    // コントロールボタン
-    document.getElementById('map-zoom-in')?.addEventListener('click', () => {
-      setScale(scale * (1 + zoomStep * 2));
-    });
-    document.getElementById('map-zoom-out')?.addEventListener('click', () => {
-      setScale(scale * (1 - zoomStep * 2));
-    });
-    document.getElementById('map-fit')?.addEventListener('click', fitAll);
+    // 中心ボタン
     document.getElementById('map-center')?.addEventListener('click', centerMap);
     
-    // ========== 初期化 ==========
-    
-    // 初期スケール適用
-    setScale(scale);
-    
-    // 少し待ってから中央に移動
+    // 初期位置
     setTimeout(() => {
-      centerMap();
-    }, 100);
-    
-    console.log('✅ Map initialized:', { mapSize, scale });
+      viewport.scrollLeft = Math.max(0, (actualSize - vpWidth) / 2);
+      viewport.scrollTop = Math.max(0, (actualSize - vpHeight) / 2);
+    }, 50);
   };
 
 })(window.HIKARI = window.HIKARI || {});
