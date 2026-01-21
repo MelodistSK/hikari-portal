@@ -37,13 +37,13 @@
       INDUSTRY: '業種',
     },
     RELATIONSHIP_COLORS: {
-      '5.プライム': '#d4af37',
-      '4.パワー': '#c0c0c0',
+      '1.プライム': '#d4af37',
+      '2.パワー': '#c0c0c0',
       '3.スタンダード': '#cd7f32',
-      '2.フレンド': '#5b9bd5',
-      '1.コネクト': '#888888',
+      '4.フレンド': '#5b9bd5',
+      '5.コネクト': '#888888',
     },
-    RELATIONSHIP_ORDER: ['5.プライム', '4.パワー', '3.スタンダード', '2.フレンド', '1.コネクト'],
+    RELATIONSHIP_ORDER: ['1.プライム', '2.パワー', '3.スタンダード', '4.フレンド', '5.コネクト'],
   };
 
   // ========================================
@@ -101,9 +101,16 @@
         .replace(/'/g, '&#039;');
     },
     
-    // 添付ファイルのBlobURLを取得
+    // 添付ファイルのBlobURLを取得（キャッシュ付き）
+    _fileUrlCache: {},
     getFileUrl: async (fileKey) => {
       if (!fileKey) return null;
+      
+      // キャッシュにあればそれを返す
+      if (Utils._fileUrlCache[fileKey]) {
+        return Utils._fileUrlCache[fileKey];
+      }
+      
       try {
         const url = kintone.api.url('/k/v1/file', true) + '?fileKey=' + fileKey;
         const resp = await fetch(url, {
@@ -111,7 +118,12 @@
         });
         if (!resp.ok) return null;
         const blob = await resp.blob();
-        return URL.createObjectURL(blob);
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // キャッシュに保存
+        Utils._fileUrlCache[fileKey] = blobUrl;
+        
+        return blobUrl;
       } catch (e) {
         console.error('ファイル取得エラー:', e);
         return null;
@@ -167,9 +179,9 @@
         mouseDownTarget = null;
       });
       
-      // ESCキー・マイナスキーで閉じる
+      // ESCキーで閉じる
       const handleKey = (e) => {
-        if (e.key === 'Escape' || e.key === '-') {
+        if (e.key === 'Escape') {
           closeModal();
         }
       };
@@ -946,10 +958,16 @@
       const hasPhoto = photo && photo.length > 0;
       const fileKey = hasPhoto ? photo[0].fileKey : '';
       
+      // キャッシュにあればURLを直接使用
+      const cachedUrl = fileKey ? Utils._fileUrlCache[fileKey] : '';
+      const photoStyle = cachedUrl 
+        ? `background-image: url('${cachedUrl}'); background-size: cover; background-position: center; color: transparent;`
+        : '';
+      
       return `
         <div class="hikari-person-card" data-record-id="${id}" style="--relationship-color: ${color}">
           <div class="hikari-card-top">
-            <div class="hikari-card-avatar" data-file-key="${fileKey}" style="background: ${color};">
+            <div class="hikari-card-avatar" data-file-key="${fileKey}" style="background: ${color}; ${photoStyle}">
               ${Utils.getInitial(name)}
             </div>
             <div class="hikari-card-info">
@@ -979,23 +997,25 @@
       });
     });
     
-    // 写真を非同期で読み込み
+    // 写真を非同期で読み込み（キャッシュにないものだけ）
     grid.querySelectorAll('.hikari-card-avatar[data-file-key]').forEach(async (avatar) => {
       const fileKey = avatar.dataset.fileKey;
-      if (fileKey) {
+      if (fileKey && !Utils._fileUrlCache[fileKey]) {
         const url = await Utils.getFileUrl(fileKey);
         if (url) {
           avatar.style.backgroundImage = `url('${url}')`;
           avatar.style.backgroundSize = 'cover';
           avatar.style.backgroundPosition = 'center';
           avatar.style.color = 'transparent';
-          
-          // 写真クリックで拡大
-          avatar.addEventListener('click', (e) => {
-            e.stopPropagation(); // カードのクリックイベントを止める
-            Utils.showPhotoModal(fileKey);
-          });
         }
+      }
+      
+      // 写真クリックで拡大（キャッシュ有無に関わらず）
+      if (fileKey) {
+        avatar.addEventListener('click', (e) => {
+          e.stopPropagation();
+          Utils.showPhotoModal(fileKey);
+        });
       }
     });
   };
