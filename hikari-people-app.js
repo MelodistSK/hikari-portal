@@ -117,6 +117,62 @@
         return null;
       }
     },
+    
+    // 写真拡大表示
+    showPhotoModal: async (fileKey) => {
+      if (!fileKey) return;
+      
+      const url = await Utils.getFileUrl(fileKey);
+      if (!url) return;
+      
+      const modal = document.createElement('div');
+      modal.className = 'hikari-photo-modal';
+      modal.innerHTML = `
+        <button class="hikari-photo-modal-close">&times;</button>
+        <img src="${url}" alt="拡大写真">
+      `;
+      
+      document.body.appendChild(modal);
+      
+      requestAnimationFrame(() => {
+        modal.classList.add('active');
+      });
+      
+      const closeModal = () => {
+        modal.classList.remove('active');
+        setTimeout(() => {
+          modal.remove();
+          URL.revokeObjectURL(url); // メモリ解放
+        }, 300);
+      };
+      
+      // 閉じるボタン
+      modal.querySelector('.hikari-photo-modal-close').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeModal();
+      });
+      
+      // オーバーレイクリックで閉じる（ドラッグ対策）
+      let mouseDownTarget = null;
+      modal.addEventListener('mousedown', (e) => {
+        mouseDownTarget = e.target;
+      });
+      modal.addEventListener('mouseup', (e) => {
+        if (mouseDownTarget === modal && e.target === modal) {
+          closeModal();
+        }
+        mouseDownTarget = null;
+      });
+      
+      // ESCキーで閉じる
+      const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+          closeModal();
+          document.removeEventListener('keydown', handleEsc);
+        }
+      };
+      document.addEventListener('keydown', handleEsc);
+    },
   };
 
   // ========================================
@@ -660,6 +716,61 @@
       opacity: 0.5;
     }
     
+    /* ========== 写真拡大モーダル ========== */
+    .hikari-photo-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      cursor: zoom-out;
+    }
+    
+    .hikari-photo-modal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .hikari-photo-modal img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 10px;
+      box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+    }
+    
+    .hikari-photo-modal-close {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 3rem;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.3s ease;
+    }
+    
+    .hikari-photo-modal-close:hover {
+      opacity: 1;
+    }
+    
+    /* アバターにポインターカーソル */
+    .hikari-card-avatar[data-file-key]:not([data-file-key=""]),
+    .hikari-detail-avatar[data-file-key]:not([data-file-key=""]),
+    .hikari-form-photo-preview[data-file-key]:not([data-file-key=""]) {
+      cursor: zoom-in;
+    }
+    
     /* ========== kintone標準UI非表示 ========== */
     .gaia-argoui-app-index-pager,
     .gaia-argoui-app-toolbar,
@@ -868,6 +979,12 @@
           avatar.style.backgroundSize = 'cover';
           avatar.style.backgroundPosition = 'center';
           avatar.style.color = 'transparent';
+          
+          // 写真クリックで拡大
+          avatar.addEventListener('click', (e) => {
+            e.stopPropagation(); // カードのクリックイベントを止める
+            Utils.showPhotoModal(fileKey);
+          });
         }
       }
     });
@@ -1046,6 +1163,11 @@
             avatar.style.backgroundSize = 'cover';
             avatar.style.backgroundPosition = 'center';
             avatar.style.color = 'transparent';
+            
+            // 写真クリックで拡大
+            avatar.addEventListener('click', () => {
+              Utils.showPhotoModal(fileKey);
+            });
           }
         }
       });
@@ -1218,6 +1340,13 @@
         if (url && photoPreview) {
           photoPreview.style.backgroundImage = `url('${url}')`;
           photoPreview.textContent = '';
+          
+          // 写真クリックで拡大（既存写真のみ）
+          photoPreview.addEventListener('click', () => {
+            if (!selectedFile && fileKey) { // 新しい写真を選んでいない場合
+              Utils.showPhotoModal(fileKey);
+            }
+          });
         }
       });
     }
