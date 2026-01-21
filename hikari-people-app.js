@@ -37,13 +37,13 @@
       INDUSTRY: '業種',
     },
     RELATIONSHIP_COLORS: {
-      'プライム': '#d4af37',
-      'パワー': '#c0c0c0',
-      'スタンダード': '#cd7f32',
-      'フレンド': '#5b9bd5',
-      'コネクト': '#888888',
+      '5.プライム': '#d4af37',
+      '4.パワー': '#c0c0c0',
+      '3.スタンダード': '#cd7f32',
+      '2.フレンド': '#5b9bd5',
+      '1.コネクト': '#888888',
     },
-    RELATIONSHIP_ORDER: ['プライム', 'パワー', 'スタンダード', 'フレンド', 'コネクト'],
+    RELATIONSHIP_ORDER: ['5.プライム', '4.パワー', '3.スタンダード', '2.フレンド', '1.コネクト'],
   };
 
   // ========================================
@@ -1183,54 +1183,82 @@
         }
       }
       
+      console.log('📝 送信データ:', JSON.stringify(data, null, 2));
+      
       try {
         // 写真アップロード
         if (selectedFile) {
+          console.log('📷 写真アップロード開始:', selectedFile.name, selectedFile.size, 'bytes');
           const fileFormData = new FormData();
           fileFormData.append('file', selectedFile, selectedFile.name);
           
           // kintone.api.url()を使って正しいURLを取得
           const uploadUrl = kintone.api.url('/k/v1/file', true);
+          console.log('📷 アップロードURL:', uploadUrl);
           
           const uploadResult = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', uploadUrl);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.onload = function() {
+              console.log('📷 アップロード結果:', xhr.status, xhr.responseText);
               if (xhr.status === 200) {
                 resolve(JSON.parse(xhr.responseText));
               } else {
-                reject(new Error('ファイルアップロードに失敗しました: ' + xhr.status));
+                reject(new Error('ファイルアップロードに失敗しました: ' + xhr.status + ' - ' + xhr.responseText));
               }
             };
             xhr.onerror = function() {
+              console.error('📷 ネットワークエラー');
               reject(new Error('ネットワークエラー'));
             };
             xhr.send(fileFormData);
           });
           
+          console.log('📷 アップロード成功:', uploadResult);
           data[CONFIG.FIELDS.PHOTO] = { value: [{ fileKey: uploadResult.fileKey }] };
         }
         
+        console.log('💾 最終送信データ:', JSON.stringify(data, null, 2));
+        
+        let result;
         if (isNew) {
-          await kintone.api('/k/v1/record', 'POST', {
+          console.log('➕ 新規レコード作成');
+          result = await kintone.api('/k/v1/record', 'POST', {
             app: CONFIG.APP_ID,
             record: data,
           });
+          console.log('✅ 作成成功:', result);
         } else {
-          await kintone.api('/k/v1/record', 'PUT', {
+          console.log('✏️ レコード更新 ID:', id);
+          result = await kintone.api('/k/v1/record', 'PUT', {
             app: CONFIG.APP_ID,
             id: id,
             record: data,
           });
+          console.log('✅ 更新成功:', result);
         }
         
         closeModal();
         await refreshData();
         
       } catch (err) {
-        console.error('Save error:', err);
-        alert('保存に失敗しました: ' + (err.message || err));
+        console.error('❌ 保存エラー:', err);
+        console.error('❌ エラー詳細:', JSON.stringify(err, null, 2));
+        if (err.message) console.error('❌ メッセージ:', err.message);
+        if (err.errors) console.error('❌ フィールドエラー:', JSON.stringify(err.errors, null, 2));
+        
+        let errorMsg = '保存に失敗しました。\n\n';
+        if (err.message) {
+          errorMsg += 'エラー: ' + err.message + '\n';
+        }
+        if (err.errors) {
+          errorMsg += '\nフィールドエラー:\n';
+          for (const [field, detail] of Object.entries(err.errors)) {
+            errorMsg += `・${field}: ${JSON.stringify(detail)}\n`;
+          }
+        }
+        alert(errorMsg);
         submitBtn.disabled = false;
         submitBtn.textContent = '保存';
       }
