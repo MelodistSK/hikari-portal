@@ -116,6 +116,19 @@
       padding: 30px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #f7e7ce;
+      box-sizing: border-box;
+    }
+    
+    .hikari-people-container *,
+    .hikari-people-container *::before,
+    .hikari-people-container *::after {
+      box-sizing: border-box;
+    }
+    
+    .hikari-modal *,
+    .hikari-modal *::before,
+    .hikari-modal *::after {
+      box-sizing: border-box;
     }
     
     /* ========== ヘッダー ========== */
@@ -543,10 +556,6 @@
     }
     
     /* ========== 編集フォーム ========== */
-    .hikari-form-group {
-      margin-bottom: 20px;
-    }
-    
     .hikari-form-label {
       display: block;
       font-size: 0.9rem;
@@ -587,8 +596,19 @@
     
     .hikari-form-row {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: 1fr 1fr;
       gap: 20px;
+    }
+    
+    @media (max-width: 600px) {
+      .hikari-form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .hikari-form-group {
+      margin-bottom: 20px;
+      min-width: 0;
     }
     
     .hikari-form-photo-preview {
@@ -1127,6 +1147,10 @@
     modal.querySelector('#hikari-edit-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
+      const submitBtn = modal.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '保存中...';
+      
       const formData = new FormData(e.target);
       const data = {};
       
@@ -1158,14 +1182,19 @@
         // 写真アップロード
         if (selectedFile) {
           const fileFormData = new FormData();
-          fileFormData.append('file', selectedFile);
-          const uploadResp = await fetch('/k/v1/file.json', {
-            method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            body: fileFormData,
-          });
-          const uploadResult = await uploadResp.json();
-          data[CONFIG.FIELDS.PHOTO] = { value: [{ fileKey: uploadResult.fileKey }] };
+          fileFormData.append('file', selectedFile, selectedFile.name);
+          
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/k/v1/file.json', false); // 同期リクエスト
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+          xhr.send(fileFormData);
+          
+          if (xhr.status === 200) {
+            const uploadResult = JSON.parse(xhr.responseText);
+            data[CONFIG.FIELDS.PHOTO] = { value: [{ fileKey: uploadResult.fileKey }] };
+          } else {
+            throw new Error('ファイルアップロードに失敗しました');
+          }
         }
         
         if (isNew) {
@@ -1187,6 +1216,8 @@
       } catch (err) {
         console.error('Save error:', err);
         alert('保存に失敗しました: ' + (err.message || err));
+        submitBtn.disabled = false;
+        submitBtn.textContent = '保存';
       }
     });
     
