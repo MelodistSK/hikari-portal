@@ -179,6 +179,12 @@
         closeModal();
       });
       
+      // 画像クリックでも閉じる
+      modal.querySelector('img').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeModal();
+      });
+      
       // オーバーレイクリックで閉じる（ドラッグ対策）
       let mouseDownTarget = null;
       modal.addEventListener('mousedown', (e) => {
@@ -779,6 +785,7 @@
       object-fit: contain;
       border-radius: 10px;
       box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+      cursor: zoom-out;
     }
     
     .hikari-photo-modal-close {
