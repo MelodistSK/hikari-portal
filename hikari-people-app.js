@@ -981,8 +981,17 @@
     };
     
     modal.querySelector('.hikari-modal-close').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal();
+    
+    // オーバーレイクリックで閉じる（ドラッグ対策：mousedownとmouseup両方がオーバーレイ上の場合のみ）
+    let mouseDownTarget = null;
+    modal.addEventListener('mousedown', (e) => {
+      mouseDownTarget = e.target;
+    });
+    modal.addEventListener('mouseup', (e) => {
+      if (mouseDownTarget === modal && e.target === modal) {
+        closeModal();
+      }
+      mouseDownTarget = null;
     });
     
     // 編集ボタン
@@ -1124,8 +1133,17 @@
     
     modal.querySelector('.hikari-modal-close').addEventListener('click', closeModal);
     modal.querySelector('.hikari-modal-cancel').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal();
+    
+    // オーバーレイクリックで閉じる（ドラッグ対策：mousedownとmouseup両方がオーバーレイ上の場合のみ）
+    let mouseDownTarget = null;
+    modal.addEventListener('mousedown', (e) => {
+      mouseDownTarget = e.target;
+    });
+    modal.addEventListener('mouseup', (e) => {
+      if (mouseDownTarget === modal && e.target === modal) {
+        closeModal();
+      }
+      mouseDownTarget = null;
     });
     
     // 写真選択
