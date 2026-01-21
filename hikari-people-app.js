@@ -1209,6 +1209,7 @@
           console.log('📷 写真アップロード開始:', selectedFile.name, selectedFile.size, 'bytes');
           const fileFormData = new FormData();
           fileFormData.append('file', selectedFile, selectedFile.name);
+          fileFormData.append('__REQUEST_TOKEN__', kintone.getRequestToken()); // CSRFトークン追加
           
           // kintone.api.url()を使って正しいURLを取得
           const uploadUrl = kintone.api.url('/k/v1/file', true);
