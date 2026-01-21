@@ -144,6 +144,9 @@
           modal.remove();
           URL.revokeObjectURL(url); // メモリ解放
         }, 300);
+        // イベントリスナー削除
+        document.removeEventListener('keydown', handleKey);
+        document.removeEventListener('wheel', handleWheel);
       };
       
       // 閉じるボタン
@@ -164,14 +167,21 @@
         mouseDownTarget = null;
       });
       
-      // ESCキーで閉じる
-      const handleEsc = (e) => {
-        if (e.key === 'Escape') {
+      // ESCキー・マイナスキーで閉じる
+      const handleKey = (e) => {
+        if (e.key === 'Escape' || e.key === '-') {
           closeModal();
-          document.removeEventListener('keydown', handleEsc);
         }
       };
-      document.addEventListener('keydown', handleEsc);
+      document.addEventListener('keydown', handleKey);
+      
+      // ホイールで縮小方向に回したら閉じる
+      const handleWheel = (e) => {
+        if (e.deltaY > 0) { // 下方向（縮小）
+          closeModal();
+        }
+      };
+      document.addEventListener('wheel', handleWheel, { passive: true });
     },
   };
 
