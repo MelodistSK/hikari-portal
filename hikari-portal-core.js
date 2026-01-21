@@ -1107,42 +1107,6 @@
       font-weight: 500;
     }
     
-    .hikari-minimap {
-      position: absolute;
-      bottom: 15px;
-      right: 15px;
-      width: 120px;
-      height: 120px;
-      background: rgba(0, 0, 0, 0.85);
-      border: 1px solid rgba(212, 175, 55, 0.4);
-      border-radius: 8px;
-      overflow: hidden;
-      cursor: pointer;
-    }
-    
-    .hikari-minimap:hover {
-      border-color: rgba(212, 175, 55, 0.7);
-    }
-    
-    .hikari-minimap-dot {
-      position: absolute;
-      width: 4px;
-      height: 4px;
-      margin-left: -2px;
-      margin-top: -2px;
-      border-radius: 50%;
-      pointer-events: none;
-    }
-    
-    .hikari-minimap-viewport {
-      position: absolute;
-      border: 2px solid #d4af37;
-      background: rgba(212, 175, 55, 0.1);
-      border-radius: 2px;
-      pointer-events: none;
-      box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
-    }
-    
     .hikari-map-tooltip {
       position: absolute;
       background: rgba(10, 10, 10, 0.95);
