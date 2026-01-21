@@ -18,20 +18,23 @@
       COMPANY: 'ルックアップ',
       POSITION: '役職',
       PHONE: '電話番号',
-      MOBILE: '携帯電話',
       EMAIL: 'メールアドレス',
       POSTAL_CODE: '郵便番号',
       ADDRESS: '住所',
+      HP: 'HP',
+      FACEBOOK: 'Facebook',
+      INSTAGRAM: 'Instagram',
       REFERRER: '紹介者',
-      REFERRER_ID: '紹介者ID',
+      REFERRER_ID: '紹介者rid',
       RELATIONSHIP: 'お付き合い度合い',
-      LAST_CONTACT: '最終接点日',
-      CONTACT_COUNT: '接点回数',
-      BIRTHDAY: '誕生日',
-      HOBBY: '趣味',
-      FAMILY: '家族構成',
-      NOTES: '備考',
-      PHOTO: '写真',
+      LAST_CONTACT: 'last_contact_date',
+      LAST_CONTACT_TYPE: 'last_contact_type',
+      CONTACT_COUNT: 'contact_count',
+      BIRTHDAY: 'birthday',
+      NOTES: 'shokai_memo',
+      PHOTO: '顔写真',
+      BUSINESS_CARD: '名刺写真',
+      INDUSTRY: '業種',
     },
     RELATIONSHIP_COLORS: {
       'プライム': '#d4af37',
@@ -850,16 +853,16 @@
     const company = Utils.getFieldValue(record, CONFIG.FIELDS.COMPANY);
     const position = Utils.getFieldValue(record, CONFIG.FIELDS.POSITION);
     const phone = Utils.getFieldValue(record, CONFIG.FIELDS.PHONE);
-    const mobile = Utils.getFieldValue(record, CONFIG.FIELDS.MOBILE);
     const email = Utils.getFieldValue(record, CONFIG.FIELDS.EMAIL);
     const address = Utils.getFieldValue(record, CONFIG.FIELDS.ADDRESS);
+    const hp = Utils.getFieldValue(record, CONFIG.FIELDS.HP);
+    const facebook = Utils.getFieldValue(record, CONFIG.FIELDS.FACEBOOK);
+    const instagram = Utils.getFieldValue(record, CONFIG.FIELDS.INSTAGRAM);
     const referrer = Utils.getFieldValue(record, CONFIG.FIELDS.REFERRER);
     const relationship = Utils.getFieldValue(record, CONFIG.FIELDS.RELATIONSHIP);
     const lastContact = Utils.getFieldValue(record, CONFIG.FIELDS.LAST_CONTACT);
     const contactCount = Utils.getFieldValue(record, CONFIG.FIELDS.CONTACT_COUNT);
     const birthday = Utils.getFieldValue(record, CONFIG.FIELDS.BIRTHDAY);
-    const hobby = Utils.getFieldValue(record, CONFIG.FIELDS.HOBBY);
-    const family = Utils.getFieldValue(record, CONFIG.FIELDS.FAMILY);
     const notes = Utils.getFieldValue(record, CONFIG.FIELDS.NOTES);
     const photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
     const color = Utils.getRelationshipColor(relationship);
@@ -897,16 +900,25 @@
                 <span class="hikari-detail-value">${phone ? `<a href="tel:${phone}">${Utils.escapeHtml(phone)}</a>` : '-'}</span>
               </div>
               <div class="hikari-detail-item">
-                <span class="hikari-detail-label">携帯電話</span>
-                <span class="hikari-detail-value">${mobile ? `<a href="tel:${mobile}">${Utils.escapeHtml(mobile)}</a>` : '-'}</span>
-              </div>
-              <div class="hikari-detail-item full">
                 <span class="hikari-detail-label">メール</span>
                 <span class="hikari-detail-value">${email ? `<a href="mailto:${email}">${Utils.escapeHtml(email)}</a>` : '-'}</span>
               </div>
               <div class="hikari-detail-item full">
                 <span class="hikari-detail-label">住所</span>
                 <span class="hikari-detail-value">${Utils.escapeHtml(address) || '-'}</span>
+              </div>
+              <div class="hikari-detail-item">
+                <span class="hikari-detail-label">HP</span>
+                <span class="hikari-detail-value">${hp ? `<a href="${hp}" target="_blank">${Utils.escapeHtml(hp)}</a>` : '-'}</span>
+              </div>
+              <div class="hikari-detail-item">
+                <span class="hikari-detail-label">SNS</span>
+                <span class="hikari-detail-value">
+                  ${facebook ? `<a href="${facebook}" target="_blank">Facebook</a>` : ''}
+                  ${facebook && instagram ? ' / ' : ''}
+                  ${instagram ? `<a href="${instagram}" target="_blank">Instagram</a>` : ''}
+                  ${!facebook && !instagram ? '-' : ''}
+                </span>
               </div>
             </div>
           </div>
@@ -937,19 +949,11 @@
             <div class="hikari-detail-section-title">プロフィール</div>
             <div class="hikari-detail-grid">
               <div class="hikari-detail-item">
-                <span class="hikari-detail-label">誕生日</span>
+                <span class="hikari-detail-label">生年月日</span>
                 <span class="hikari-detail-value">${Utils.formatBirthday(birthday) || '-'}</span>
               </div>
-              <div class="hikari-detail-item">
-                <span class="hikari-detail-label">家族構成</span>
-                <span class="hikari-detail-value">${Utils.escapeHtml(family) || '-'}</span>
-              </div>
               <div class="hikari-detail-item full">
-                <span class="hikari-detail-label">趣味</span>
-                <span class="hikari-detail-value">${Utils.escapeHtml(hobby) || '-'}</span>
-              </div>
-              <div class="hikari-detail-item full">
-                <span class="hikari-detail-label">備考</span>
+                <span class="hikari-detail-label">メモ</span>
                 <span class="hikari-detail-value">${Utils.escapeHtml(notes) || '-'}</span>
               </div>
             </div>
@@ -1050,19 +1054,30 @@
                 <input type="tel" class="hikari-form-input" name="phone" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.PHONE))}">
               </div>
               <div class="hikari-form-group">
-                <label class="hikari-form-label">携帯電話</label>
-                <input type="tel" class="hikari-form-input" name="mobile" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.MOBILE))}">
+                <label class="hikari-form-label">メールアドレス</label>
+                <input type="email" class="hikari-form-input" name="email" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.EMAIL))}">
               </div>
-            </div>
-            
-            <div class="hikari-form-group">
-              <label class="hikari-form-label">メールアドレス</label>
-              <input type="email" class="hikari-form-input" name="email" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.EMAIL))}">
             </div>
             
             <div class="hikari-form-group">
               <label class="hikari-form-label">住所</label>
               <input type="text" class="hikari-form-input" name="address" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.ADDRESS))}">
+            </div>
+            
+            <div class="hikari-form-row">
+              <div class="hikari-form-group">
+                <label class="hikari-form-label">HP</label>
+                <input type="url" class="hikari-form-input" name="hp" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.HP))}" placeholder="https://...">
+              </div>
+              <div class="hikari-form-group">
+                <label class="hikari-form-label">Facebook</label>
+                <input type="url" class="hikari-form-input" name="facebook" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.FACEBOOK))}" placeholder="https://facebook.com/...">
+              </div>
+            </div>
+            
+            <div class="hikari-form-group">
+              <label class="hikari-form-label">Instagram</label>
+              <input type="url" class="hikari-form-input" name="instagram" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.INSTAGRAM))}" placeholder="https://instagram.com/...">
             </div>
             
             <div class="hikari-form-row">
@@ -1076,23 +1091,13 @@
                 </select>
               </div>
               <div class="hikari-form-group">
-                <label class="hikari-form-label">誕生日</label>
+                <label class="hikari-form-label">生年月日</label>
                 <input type="date" class="hikari-form-input" name="birthday" value="${getVal(CONFIG.FIELDS.BIRTHDAY)}">
               </div>
             </div>
             
             <div class="hikari-form-group">
-              <label class="hikari-form-label">趣味</label>
-              <input type="text" class="hikari-form-input" name="hobby" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.HOBBY))}">
-            </div>
-            
-            <div class="hikari-form-group">
-              <label class="hikari-form-label">家族構成</label>
-              <input type="text" class="hikari-form-input" name="family" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.FAMILY))}">
-            </div>
-            
-            <div class="hikari-form-group">
-              <label class="hikari-form-label">備考</label>
+              <label class="hikari-form-label">メモ</label>
               <textarea class="hikari-form-textarea" name="notes">${Utils.escapeHtml(getVal(CONFIG.FIELDS.NOTES))}</textarea>
             </div>
             
@@ -1161,13 +1166,13 @@
         'company': CONFIG.FIELDS.COMPANY,
         'position': CONFIG.FIELDS.POSITION,
         'phone': CONFIG.FIELDS.PHONE,
-        'mobile': CONFIG.FIELDS.MOBILE,
         'email': CONFIG.FIELDS.EMAIL,
         'address': CONFIG.FIELDS.ADDRESS,
+        'hp': CONFIG.FIELDS.HP,
+        'facebook': CONFIG.FIELDS.FACEBOOK,
+        'instagram': CONFIG.FIELDS.INSTAGRAM,
         'relationship': CONFIG.FIELDS.RELATIONSHIP,
         'birthday': CONFIG.FIELDS.BIRTHDAY,
-        'hobby': CONFIG.FIELDS.HOBBY,
-        'family': CONFIG.FIELDS.FAMILY,
         'notes': CONFIG.FIELDS.NOTES,
       };
       
