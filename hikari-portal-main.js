@@ -244,22 +244,20 @@
   };
 
   // ========================================
-  //  アニメーション開始
+  //  アニメーション開始（無効化）
   // ========================================
   
   HIKARI.startAnimations = () => {
-    // スライドアップアニメーション
-    document.querySelectorAll('.hikari-animate-slide-up').forEach((el, i) => {
-      setTimeout(() => {
-        el.style.opacity = '1';
-      }, 100 * i);
+    // アニメーションなし - 即座に表示
+    document.querySelectorAll('.hikari-animate-slide-up').forEach(el => {
+      el.style.opacity = '1';
     });
     
-    // カウントアップアニメーション
+    // カウントアップも即座に最終値を表示
     document.querySelectorAll('.hikari-kpi-value[data-count]').forEach(el => {
       const target = parseInt(el.dataset.count, 10);
       if (!isNaN(target)) {
-        HIKARI.utils.animateCount(el, target, 1500);
+        el.textContent = HIKARI.utils.formatNumber(target);
       }
     });
   };
@@ -280,10 +278,8 @@
   kintone.events.on('portal.show', (event) => {
     console.log('🌟 ポータル表示イベント');
     
-    // 少し待ってから初期化（DOM準備待ち）
-    setTimeout(() => {
-      HIKARI.init();
-    }, 100);
+    // 即座に初期化（待機不要）
+    HIKARI.init();
     
     return event;
   });
