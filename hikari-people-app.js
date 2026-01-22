@@ -35,6 +35,7 @@
       PHOTO: '顔写真',
       BUSINESS_CARD: '名刺写真',
       INDUSTRY: '業種',
+      PERSONALITY: 'パーソナリティ評価',
       // サブテーブル
       CONTACT_HISTORY: 'contact_history',
       CONTACT_DATE: 'contact_date',
@@ -1042,6 +1043,120 @@
       font-size: 0.85rem;
       cursor: pointer;
     }
+    
+    /* ========== 紹介者検索 ========== */
+    .hikari-referrer-container {
+      position: relative;
+    }
+    
+    .hikari-referrer-clear {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: none;
+      line-height: 1;
+    }
+    
+    .hikari-referrer-clear.show {
+      display: block;
+    }
+    
+    .hikari-referrer-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: linear-gradient(145deg, rgba(26, 26, 46, 0.98), rgba(16, 16, 35, 0.98));
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
+    
+    .hikari-referrer-dropdown.active {
+      display: block;
+    }
+    
+    .hikari-referrer-item {
+      padding: 12px 15px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+      transition: background 0.2s ease;
+    }
+    
+    .hikari-referrer-item:hover {
+      background: rgba(212, 175, 55, 0.1);
+    }
+    
+    .hikari-referrer-item:last-child {
+      border-bottom: none;
+    }
+    
+    .hikari-referrer-name {
+      color: #f7e7ce;
+      font-weight: 500;
+      margin-bottom: 3px;
+    }
+    
+    .hikari-referrer-company {
+      color: #888;
+      font-size: 0.85rem;
+    }
+    
+    .hikari-referrer-no-results {
+      padding: 15px;
+      text-align: center;
+      color: #666;
+    }
+    
+    /* ========== パーソナリティ評価 ========== */
+    .hikari-personality-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .hikari-personality-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .hikari-personality-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #d4af37;
+    }
+    
+    .hikari-personality-item label {
+      color: #f7e7ce;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    
+    /* ========== 重複警告 ========== */
+    .hikari-duplicate-warning {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 12px 15px;
+      color: #ef4444;
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+      display: none;
+    }
+    
+    .hikari-duplicate-warning.show {
+      display: block;
+    }
     `;
     document.head.appendChild(style);
   };
@@ -1054,6 +1169,77 @@
   let filteredRecords = [];
   let currentFilter = 'all';
   let currentSearch = '';
+  
+  // フォームオプション（動的に読み込み）
+  let referrerOptions = [];
+  let industryOptions = [];
+  let personalityOptions = [];
+
+  // 紹介者オプションを読み込み（既存人脈から）
+  const loadReferrerOptions = async () => {
+    try {
+      referrerOptions = allRecords.map(record => ({
+        id: Utils.getFieldValue(record, '$id'),
+        name: Utils.getFieldValue(record, CONFIG.FIELDS.NAME),
+        company: Utils.getFieldValue(record, CONFIG.FIELDS.COMPANY),
+      })).filter(r => r.name);
+      referrerOptions.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    } catch (error) {
+      console.error('紹介者データの読み込みに失敗:', error);
+    }
+  };
+  
+  // 業種選択肢を読み込み
+  const loadIndustryOptions = async () => {
+    try {
+      const formFields = await kintone.api('/k/v1/app/form/fields', 'GET', {
+        app: CONFIG.APP_ID
+      });
+      const industryField = formFields.properties[CONFIG.FIELDS.INDUSTRY];
+      if (industryField && industryField.type === 'DROP_DOWN') {
+        industryOptions = industryField.options ? 
+          Object.entries(industryField.options)
+            .filter(([key]) => key !== '')
+            .sort((a, b) => parseInt(a[1].index) - parseInt(b[1].index))
+            .map(([key]) => key) : [];
+      }
+    } catch (error) {
+      console.error('業種選択肢の取得に失敗:', error);
+    }
+  };
+  
+  // パーソナリティ評価選択肢を読み込み
+  const loadPersonalityOptions = async () => {
+    try {
+      const formFields = await kintone.api('/k/v1/app/form/fields', 'GET', {
+        app: CONFIG.APP_ID
+      });
+      const personalityField = formFields.properties[CONFIG.FIELDS.PERSONALITY];
+      if (personalityField && personalityField.type === 'CHECK_BOX') {
+        personalityOptions = personalityField.options ? 
+          Object.entries(personalityField.options)
+            .filter(([key]) => key !== '')
+            .sort((a, b) => parseInt(a[1].index) - parseInt(b[1].index))
+            .map(([key]) => key) : [];
+      }
+    } catch (error) {
+      console.error('パーソナリティ評価選択肢の取得に失敗:', error);
+    }
+  };
+  
+  // 重複チェック
+  const isDuplicateName = async (name) => {
+    try {
+      const normalizedName = name.replace(/\s+/g, '');
+      const response = await kintone.api('/k/v1/records', 'GET', {
+        app: CONFIG.APP_ID,
+        query: `${CONFIG.FIELDS.NAME} = "${normalizedName}"`
+      });
+      return response.records.length > 0;
+    } catch (error) {
+      return false;
+    }
+  };
 
   // 全レコード取得
   const fetchAllRecords = async () => {
@@ -1594,6 +1780,14 @@
     const hasPhoto = photo && photo.length > 0;
     const fileKey = hasPhoto ? photo[0].fileKey : '';
     
+    // パーソナリティ評価の現在値（配列）
+    const currentPersonality = record ? Utils.getFieldValue(record, CONFIG.FIELDS.PERSONALITY) : [];
+    const personalityArray = Array.isArray(currentPersonality) ? currentPersonality : [];
+    
+    // 紹介者の現在値
+    const currentReferrerId = getVal(CONFIG.FIELDS.REFERRER_ID);
+    const currentReferrerName = getVal(CONFIG.FIELDS.REFERRER);
+    
     const modal = document.createElement('div');
     modal.className = 'hikari-modal-overlay';
     modal.innerHTML = `
@@ -1604,6 +1798,11 @@
         </div>
         <div class="hikari-modal-body">
           <form id="hikari-edit-form">
+            <!-- 重複警告 -->
+            <div class="hikari-duplicate-warning" id="duplicate-warning">
+              ⚠️ 同姓同名の人脈が既に登録されています。重複登録にご注意ください。
+            </div>
+            
             <div class="hikari-form-group" style="text-align: center;">
               <div class="hikari-form-photo-preview" id="photo-preview" data-file-key="${fileKey}">${hasPhoto ? '' : '📷'}</div>
               <input type="file" id="photo-input" accept="image/*" style="display: none;">
@@ -1613,7 +1812,7 @@
             <div class="hikari-form-row">
               <div class="hikari-form-group">
                 <label class="hikari-form-label">名前 *</label>
-                <input type="text" class="hikari-form-input" name="name" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.NAME))}" required>
+                <input type="text" class="hikari-form-input" name="name" id="edit-name" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.NAME))}" required>
               </div>
               <div class="hikari-form-group">
                 <label class="hikari-form-label">ふりがな</label>
@@ -1664,6 +1863,19 @@
               <input type="url" class="hikari-form-input" name="instagram" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.INSTAGRAM))}" placeholder="https://instagram.com/...">
             </div>
             
+            <!-- 紹介者検索 -->
+            <div class="hikari-form-group">
+              <label class="hikari-form-label">紹介者</label>
+              <div class="hikari-referrer-container">
+                <input type="text" class="hikari-form-input" id="referrer-search" placeholder="紹介者名を入力して検索..." 
+                  value="${currentReferrerName ? `${Utils.escapeHtml(currentReferrerName)}` : ''}">
+                <input type="hidden" id="referrer-id" value="${currentReferrerId}">
+                <input type="hidden" id="referrer-name" value="${Utils.escapeHtml(currentReferrerName)}">
+                <button type="button" class="hikari-referrer-clear ${currentReferrerId ? 'show' : ''}" id="referrer-clear">×</button>
+                <div class="hikari-referrer-dropdown" id="referrer-dropdown"></div>
+              </div>
+            </div>
+            
             <div class="hikari-form-row">
               <div class="hikari-form-group">
                 <label class="hikari-form-label">お付き合い度合い</label>
@@ -1675,10 +1887,41 @@
                 </select>
               </div>
               <div class="hikari-form-group">
+                <label class="hikari-form-label">業種</label>
+                <select class="hikari-form-select" name="industry" id="industry-select">
+                  <option value="">選択してください</option>
+                  ${industryOptions.map(opt => `
+                    <option value="${opt}" ${getVal(CONFIG.FIELDS.INDUSTRY) === opt ? 'selected' : ''}>${opt}</option>
+                  `).join('')}
+                </select>
+              </div>
+            </div>
+            
+            <div class="hikari-form-row">
+              <div class="hikari-form-group">
                 <label class="hikari-form-label">生年月日</label>
                 <input type="date" class="hikari-form-input" name="birthday" value="${getVal(CONFIG.FIELDS.BIRTHDAY)}">
               </div>
+              <div class="hikari-form-group">
+                <label class="hikari-form-label">郵便番号</label>
+                <input type="text" class="hikari-form-input" name="postalCode" value="${Utils.escapeHtml(getVal(CONFIG.FIELDS.POSTAL_CODE))}" placeholder="000-0000">
+              </div>
             </div>
+            
+            <!-- パーソナリティ評価 -->
+            ${personalityOptions.length > 0 ? `
+            <div class="hikari-form-group">
+              <label class="hikari-form-label">パーソナリティ評価</label>
+              <div class="hikari-personality-grid">
+                ${personalityOptions.map(opt => `
+                  <div class="hikari-personality-item">
+                    <input type="checkbox" id="personality-${opt}" name="personality" value="${opt}" ${personalityArray.includes(opt) ? 'checked' : ''}>
+                    <label for="personality-${opt}">${opt}</label>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            ` : ''}
             
             <div class="hikari-form-group">
               <label class="hikari-form-label">メモ</label>
@@ -1703,6 +1946,9 @@
     
     const closeModal = () => {
       modal.classList.remove('active');
+      // 紹介者ドロップダウンも削除
+      const overlayDropdown = document.getElementById('referrer-dropdown-overlay');
+      if (overlayDropdown) overlayDropdown.remove();
       setTimeout(() => modal.remove(), 300);
     };
     
@@ -1719,6 +1965,95 @@
         closeModal();
       }
       mouseDownTarget = null;
+    });
+    
+    // ========== 重複チェック ==========
+    const nameInput = modal.querySelector('#edit-name');
+    const duplicateWarning = modal.querySelector('#duplicate-warning');
+    let duplicateTimeout = null;
+    
+    nameInput.addEventListener('input', () => {
+      if (duplicateTimeout) clearTimeout(duplicateTimeout);
+      duplicateTimeout = setTimeout(async () => {
+        const name = nameInput.value.trim();
+        if (name && isNew) {
+          const isDuplicate = await isDuplicateName(name);
+          if (isDuplicate) {
+            duplicateWarning.classList.add('show');
+          } else {
+            duplicateWarning.classList.remove('show');
+          }
+        } else {
+          duplicateWarning.classList.remove('show');
+        }
+      }, 500);
+    });
+    
+    // ========== 紹介者検索 ==========
+    const referrerSearch = modal.querySelector('#referrer-search');
+    const referrerIdInput = modal.querySelector('#referrer-id');
+    const referrerNameInput = modal.querySelector('#referrer-name');
+    const referrerClearBtn = modal.querySelector('#referrer-clear');
+    const referrerDropdown = modal.querySelector('#referrer-dropdown');
+    let referrerTimeout = null;
+    
+    referrerSearch.addEventListener('input', (e) => {
+      const query = e.target.value.trim().toLowerCase();
+      
+      if (referrerTimeout) clearTimeout(referrerTimeout);
+      
+      referrerTimeout = setTimeout(() => {
+        if (query.length < 2) {
+          referrerDropdown.classList.remove('active');
+          return;
+        }
+        
+        const filtered = referrerOptions.filter(r => 
+          r.name.toLowerCase().includes(query) || 
+          (r.company && r.company.toLowerCase().includes(query))
+        ).slice(0, 30);
+        
+        if (filtered.length === 0) {
+          referrerDropdown.innerHTML = '<div class="hikari-referrer-no-results">該当する紹介者が見つかりません</div>';
+        } else {
+          referrerDropdown.innerHTML = filtered.map(r => `
+            <div class="hikari-referrer-item" data-id="${r.id}" data-name="${Utils.escapeHtml(r.name)}">
+              <div class="hikari-referrer-name">${Utils.escapeHtml(r.name)}</div>
+              <div class="hikari-referrer-company">${Utils.escapeHtml(r.company) || '会社名なし'}</div>
+            </div>
+          `).join('');
+          
+          referrerDropdown.querySelectorAll('.hikari-referrer-item').forEach(item => {
+            item.addEventListener('click', () => {
+              const refId = item.dataset.id;
+              const refName = item.dataset.name;
+              const refCompany = item.querySelector('.hikari-referrer-company').textContent;
+              
+              referrerSearch.value = refCompany !== '会社名なし' ? `${refName} (${refCompany})` : refName;
+              referrerIdInput.value = refId;
+              referrerNameInput.value = refName;
+              referrerDropdown.classList.remove('active');
+              referrerClearBtn.classList.add('show');
+            });
+          });
+        }
+        
+        referrerDropdown.classList.add('active');
+      }, 300);
+    });
+    
+    referrerClearBtn.addEventListener('click', () => {
+      referrerSearch.value = '';
+      referrerIdInput.value = '';
+      referrerNameInput.value = '';
+      referrerClearBtn.classList.remove('show');
+    });
+    
+    // ドロップダウン外クリックで閉じる
+    document.addEventListener('click', (e) => {
+      if (!referrerSearch.contains(e.target) && !referrerDropdown.contains(e.target)) {
+        referrerDropdown.classList.remove('active');
+      }
     });
     
     // 写真選択
@@ -1778,10 +2113,12 @@
         'phone': CONFIG.FIELDS.PHONE,
         'email': CONFIG.FIELDS.EMAIL,
         'address': CONFIG.FIELDS.ADDRESS,
+        'postalCode': CONFIG.FIELDS.POSTAL_CODE,
         'hp': CONFIG.FIELDS.HP,
         'facebook': CONFIG.FIELDS.FACEBOOK,
         'instagram': CONFIG.FIELDS.INSTAGRAM,
         'relationship': CONFIG.FIELDS.RELATIONSHIP,
+        'industry': CONFIG.FIELDS.INDUSTRY,
         'birthday': CONFIG.FIELDS.BIRTHDAY,
         'notes': CONFIG.FIELDS.NOTES,
       };
@@ -1791,6 +2128,19 @@
         if (value !== null && value !== undefined) {
           data[fieldCode] = { value: value };
         }
+      }
+      
+      // 紹介者
+      const refId = modal.querySelector('#referrer-id').value;
+      const refName = modal.querySelector('#referrer-name').value;
+      data[CONFIG.FIELDS.REFERRER] = { value: refName || '' };
+      data[CONFIG.FIELDS.REFERRER_ID] = { value: refId || '' };
+      
+      // パーソナリティ評価（チェックボックス）
+      const personalityChecks = modal.querySelectorAll('input[name="personality"]:checked');
+      const personalityValues = Array.from(personalityChecks).map(cb => cb.value);
+      if (personalityOptions.length > 0) {
+        data[CONFIG.FIELDS.PERSONALITY] = { value: personalityValues };
       }
       
       console.log('📝 送信データ:', JSON.stringify(data, null, 2));
@@ -1903,6 +2253,7 @@
   
   const refreshData = async () => {
     allRecords = await fetchAllRecords();
+    loadReferrerOptions(); // 紹介者オプションを更新
     applyFilters();
   };
 
@@ -1914,6 +2265,12 @@
     console.log('🌟 HIKARI People App initializing...');
     
     injectStyles();
+    
+    // フォームオプションを読み込み（業種、パーソナリティ評価）
+    await Promise.all([
+      loadIndustryOptions(),
+      loadPersonalityOptions(),
+    ]);
     
     // kintoneの一覧表示領域を取得
     const indexEl = kintone.app.getHeaderSpaceElement();
