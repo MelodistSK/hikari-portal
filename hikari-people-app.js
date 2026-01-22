@@ -43,11 +43,11 @@
     },
     CONTACT_TYPES: ['対面', '電話', 'メール', 'LINE', 'SNS', 'その他'],
     RELATIONSHIP_COLORS: {
-      '1.プライム': '#d4af37',
-      '2.パワー': '#c0c0c0',
-      '3.スタンダード': '#cd7f32',
-      '4.フレンド': '#5b9bd5',
-      '5.コネクト': '#888888',
+      '1.プライム': '#d4af37',    // ゴールド
+      '2.パワー': '#a855f7',      // パープル（紫）
+      '3.スタンダード': '#cd7f32', // ブロンズ
+      '4.フレンド': '#5b9bd5',    // ブルー
+      '5.コネクト': '#6b7280',    // グレー
     },
     RELATIONSHIP_ORDER: ['1.プライム', '2.パワー', '3.スタンダード', '4.フレンド', '5.コネクト'],
   };
@@ -1008,6 +1008,14 @@
       border-color: #d4af37;
     }
     
+    /* セレクトボックスのoption要素 */
+    .hikari-history-select option,
+    .hikari-form-select option {
+      background: #2a2a2a;
+      color: #f7e7ce;
+      padding: 10px;
+    }
+    
     .hikari-history-form-actions {
       display: flex;
       gap: 10px;
@@ -1531,7 +1539,8 @@
           
           // モーダルを閉じてデータ再読み込み
           closeModal();
-          await loadAndRender();
+          allRecords = await fetchAllRecords();
+          applyFilters();
           
           // 再度詳細モーダルを開く
           const updatedRecord = allRecords.find(r => Utils.getFieldValue(r, '$id') === id);
