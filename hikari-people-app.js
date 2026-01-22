@@ -459,6 +459,17 @@
     .hikari-card-contact {
       font-size: 0.85rem;
       color: #666;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .hikari-card-contact-type {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(212, 175, 55, 0.15);
+      color: #d4af37;
     }
     
     .hikari-card-contact-date {
@@ -1348,20 +1359,30 @@
       const position = Utils.getFieldValue(record, CONFIG.FIELDS.POSITION);
       const relationship = Utils.getFieldValue(record, CONFIG.FIELDS.RELATIONSHIP);
       let lastContact = Utils.getFieldValue(record, CONFIG.FIELDS.LAST_CONTACT);
+      let lastContactType = Utils.getFieldValue(record, CONFIG.FIELDS.LAST_CONTACT_TYPE);
       const photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
       const color = Utils.getRelationshipColor(relationship);
       
-      // last_contact_dateが空ならサブテーブルから最新日付を取得
-      if (!lastContact) {
+      // last_contact_date または last_contact_type が空ならサブテーブルから取得
+      if (!lastContact || !lastContactType) {
         const contactHistory = Utils.getFieldValue(record, CONFIG.FIELDS.CONTACT_HISTORY) || [];
         const validHistory = contactHistory.filter(row => {
           const d = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
           return d !== '';
         });
         if (validHistory.length > 0) {
-          lastContact = validHistory
-            .map(row => row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '')
-            .sort((a, b) => b.localeCompare(a))[0];
+          // 最新の接点を取得
+          const sorted = validHistory.sort((a, b) => {
+            const dateA = a.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+            const dateB = b.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+            return dateB.localeCompare(dateA);
+          });
+          if (!lastContact) {
+            lastContact = sorted[0].value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+          }
+          if (!lastContactType) {
+            lastContactType = sorted[0].value[CONFIG.FIELDS.CONTACT_TYPE]?.value || '';
+          }
         }
       }
       
@@ -1389,7 +1410,9 @@
           <div class="hikari-card-meta">
             <span class="hikari-card-relationship" style="background: ${color}">${relationship || '未設定'}</span>
             <span class="hikari-card-contact">
-              ${lastContact ? `<span class="hikari-card-contact-date">${Utils.formatDate(lastContact)}</span>` : '接点なし'}
+              ${lastContact 
+                ? `${lastContactType ? `<span class="hikari-card-contact-type">${Utils.escapeHtml(lastContactType)}</span>` : ''}<span class="hikari-card-contact-date">${Utils.formatDate(lastContact)}</span>` 
+                : '接点なし'}
             </span>
           </div>
         </div>
