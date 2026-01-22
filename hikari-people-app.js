@@ -1347,9 +1347,23 @@
       const company = Utils.getFieldValue(record, CONFIG.FIELDS.COMPANY);
       const position = Utils.getFieldValue(record, CONFIG.FIELDS.POSITION);
       const relationship = Utils.getFieldValue(record, CONFIG.FIELDS.RELATIONSHIP);
-      const lastContact = Utils.getFieldValue(record, CONFIG.FIELDS.LAST_CONTACT);
+      let lastContact = Utils.getFieldValue(record, CONFIG.FIELDS.LAST_CONTACT);
       const photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
       const color = Utils.getRelationshipColor(relationship);
+      
+      // last_contact_dateが空ならサブテーブルから最新日付を取得
+      if (!lastContact) {
+        const contactHistory = Utils.getFieldValue(record, CONFIG.FIELDS.CONTACT_HISTORY) || [];
+        const validHistory = contactHistory.filter(row => {
+          const d = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+          return d !== '';
+        });
+        if (validHistory.length > 0) {
+          lastContact = validHistory
+            .map(row => row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '')
+            .sort((a, b) => b.localeCompare(a))[0];
+        }
+      }
       
       const hasPhoto = photo && photo.length > 0;
       const fileKey = hasPhoto ? photo[0].fileKey : '';
@@ -1740,6 +1754,13 @@
           const newCount = validHistory.length;
           
           // レコード更新（サブテーブル + 集計フィールド）
+          console.log('📊 更新データ:', { 
+            validHistoryCount: validHistory.length, 
+            latestDate, 
+            latestType, 
+            newCount 
+          });
+          
           await kintone.api('/k/v1/record', 'PUT', {
             app: CONFIG.APP_ID,
             id: id,
@@ -1754,7 +1775,7 @@
                 value: latestType
               },
               [CONFIG.FIELDS.CONTACT_COUNT]: {
-                value: newCount
+                value: String(newCount)  // 数値フィールドは文字列で渡す
               }
             }
           });
