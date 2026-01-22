@@ -1186,6 +1186,7 @@
   let referrerOptions = [];
   let industryOptions = [];
   let personalityOptions = [];
+  let contactTypeOptions = [];
 
   // 紹介者オプションを読み込み（既存人脈から）
   const loadReferrerOptions = async () => {
@@ -1236,6 +1237,32 @@
       }
     } catch (error) {
       console.error('パーソナリティ評価選択肢の取得に失敗:', error);
+    }
+  };
+  
+  // 接点種別選択肢を読み込み（サブテーブル内のフィールド）
+  const loadContactTypeOptions = async () => {
+    try {
+      const formFields = await kintone.api('/k/v1/app/form/fields', 'GET', {
+        app: CONFIG.APP_ID
+      });
+      // サブテーブルのフィールド情報を取得
+      const subtableField = formFields.properties[CONFIG.FIELDS.CONTACT_HISTORY];
+      if (subtableField && subtableField.type === 'SUBTABLE') {
+        const contactTypeField = subtableField.fields[CONFIG.FIELDS.CONTACT_TYPE];
+        if (contactTypeField && (contactTypeField.type === 'DROP_DOWN' || contactTypeField.type === 'RADIO_BUTTON')) {
+          contactTypeOptions = contactTypeField.options ? 
+            Object.entries(contactTypeField.options)
+              .filter(([key]) => key !== '')
+              .sort((a, b) => parseInt(a[1].index) - parseInt(b[1].index))
+              .map(([key]) => key) : [];
+        }
+      }
+      console.log('📋 接点種別選択肢:', contactTypeOptions);
+    } catch (error) {
+      console.error('接点種別選択肢の取得に失敗:', error);
+      // フォールバック
+      contactTypeOptions = ['対面', '電話', 'メール', 'その他'];
     }
   };
   
@@ -1698,7 +1725,7 @@
             <div class="hikari-history-form-group">
               <label class="hikari-history-form-label">種別</label>
               <select class="hikari-history-select" id="new-contact-type">
-                ${CONFIG.CONTACT_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+                ${contactTypeOptions.map(t => `<option value="${t}">${t}</option>`).join('')}
               </select>
             </div>
           </div>
@@ -2333,10 +2360,11 @@
     
     injectStyles();
     
-    // フォームオプションを読み込み（業種、パーソナリティ評価）
+    // フォームオプションを読み込み（業種、パーソナリティ評価、接点種別）
     await Promise.all([
       loadIndustryOptions(),
       loadPersonalityOptions(),
+      loadContactTypeOptions(),
     ]);
     
     // kintoneの一覧表示領域を取得
