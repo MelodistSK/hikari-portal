@@ -26,6 +26,7 @@
       INSTAGRAM: 'Instagram',
       REFERRER: '紹介者',
       REFERRER_ID: '紹介者rid',
+      REFERRER_LINK: '紹介者リンク',
       RELATIONSHIP: 'お付き合い度合い',
       LAST_CONTACT: 'last_contact_date',
       LAST_CONTACT_TYPE: 'last_contact_type',
@@ -1540,8 +1541,16 @@
             </div>
             <div id="hikari-history-form-container"></div>
             <div class="hikari-history-list" id="hikari-history-list">
-              ${contactHistory.length > 0 
+              ${contactHistory.filter(row => {
+                  // 日付がない空の行は除外
+                  const date = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+                  return date !== '';
+                }).length > 0 
                 ? contactHistory
+                    .filter(row => {
+                      const date = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+                      return date !== '';
+                    })
                     .sort((a, b) => {
                       const dateA = a.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
                       const dateB = b.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
@@ -1710,10 +1719,16 @@
             }
           });
           
-          // 最新接点日・種別を計算（サブテーブル全体から）
+          // 空行を除外（日付がない行）
+          const validHistory = currentHistory.filter(row => {
+            const d = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+            return d !== '';
+          });
+          
+          // 最新接点日・種別を計算（有効な行から）
           let latestDate = '';
           let latestType = '';
-          currentHistory.forEach(row => {
+          validHistory.forEach(row => {
             const d = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
             if (d && d > latestDate) {
               latestDate = d;
@@ -1721,8 +1736,8 @@
             }
           });
           
-          // 接点回数
-          const newCount = currentHistory.length;
+          // 接点回数（有効な行のみカウント）
+          const newCount = validHistory.length;
           
           // レコード更新（サブテーブル + 集計フィールド）
           await kintone.api('/k/v1/record', 'PUT', {
@@ -1730,7 +1745,7 @@
             id: id,
             record: {
               [CONFIG.FIELDS.CONTACT_HISTORY]: {
-                value: currentHistory
+                value: validHistory
               },
               [CONFIG.FIELDS.LAST_CONTACT]: {
                 value: latestDate
@@ -2135,6 +2150,14 @@
       const refName = modal.querySelector('#referrer-name').value;
       data[CONFIG.FIELDS.REFERRER] = { value: refName || '' };
       data[CONFIG.FIELDS.REFERRER_ID] = { value: refId || '' };
+      
+      // 紹介者リンク（ridがあれば生成）
+      if (refId) {
+        const refLink = location.origin + '/k/' + CONFIG.APP_ID + '/show#record=' + refId;
+        data[CONFIG.FIELDS.REFERRER_LINK] = { value: refLink };
+      } else {
+        data[CONFIG.FIELDS.REFERRER_LINK] = { value: '' };
+      }
       
       // パーソナリティ評価（チェックボックス）
       const personalityChecks = modal.querySelectorAll('input[name="personality"]:checked');
