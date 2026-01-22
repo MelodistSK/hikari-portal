@@ -1,6 +1,14 @@
 /**
- * HIKARI Mobile People App v8
- * 動作確認済みバージョン
+ * HIKARI Mobile People App v9
+ * PC版機能完全移植版
+ * 
+ * 追加機能:
+ * - kintone標準UI完全非表示（強化版CSS）
+ * - 写真タップで拡大表示
+ * - 紹介者ルックアップ（検索・選択）
+ * - 住所/HP/Facebook/Instagram/郵便番号フィールド
+ * - 名刺写真
+ * - 重複チェック
  */
 (function() {
   'use strict';
@@ -14,8 +22,14 @@
       POSITION: '役職',
       PHONE: '電話番号',
       EMAIL: 'メールアドレス',
+      POSTAL_CODE: '郵便番号',
+      ADDRESS: '住所',
+      HP: 'HP',
+      FACEBOOK: 'Facebook',
+      INSTAGRAM: 'Instagram',
       BIRTHDAY: 'birthday',
       PHOTO: '顔写真',
+      BUSINESS_CARD: '名刺写真',
       INDUSTRY: '業種',
       RELATIONSHIP: 'お付き合い度合い',
       PERSONALITY: 'パーソナリティ評価',
@@ -52,7 +66,7 @@
     },
     escapeHtml: function(str) {
       if (!str) return '';
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     },
     formatDate: function(dateStr) {
       if (!dateStr) return '';
@@ -106,16 +120,118 @@
     referrerOptions: [],
     currentRecord: null,
     editRecord: null,
-    photoFile: null
+    photoFile: null,
+    businessCardFile: null
   };
 
-  // kintone標準UIを非表示
+  // ========== kintone標準UI完全非表示（強化版） ==========
   function hideKintoneUI() {
     var css = document.createElement('style');
-    css.textContent = '.gaia-mobile-v2-viewpanel-viewtab,.gaia-mobile-v2-viewpanel-pager,.gaia-mobile-v2-viewpanel-viewlist,.gaia-mobile-v2-app-index-pager,.gaia-mobile-v2-viewpanel-recordlist,.gaia-mobile-v2-app-index-toolbar{display:none!important}';
+    css.id = 'hikari-hide-kintone-ui';
+    css.textContent = [
+      // モバイル標準UI
+      '.gaia-mobile-v2-viewpanel-viewtab',
+      '.gaia-mobile-v2-viewpanel-pager',
+      '.gaia-mobile-v2-viewpanel-viewlist',
+      '.gaia-mobile-v2-viewpanel-recordlist',
+      '.gaia-mobile-v2-app-index-pager',
+      '.gaia-mobile-v2-app-index-toolbar',
+      '.gaia-mobile-v2-app-index-addbutton',
+      // レコード一覧
+      '.recordlist-gaia',
+      '.gaia-mobile-v2-recordlist',
+      '.gaia-mobile-v2-record-single-show',
+      // 追加ボタン
+      '.gaia-mobile-v2-app-addbutton',
+      '.gaia-mobile-v2-app-toolbar-gaia',
+      // ツールバー
+      '.gaia-mobile-v2-app-index-view',
+      // その他
+      '.gaia-mobile-v2-buttonarea',
+      '.gaia-mobile-v2-messagepanel',
+      '.gaia-mobile-v2-app-pager',
+      // 新しい要素
+      '.recordlist-wrapper-gaia',
+      '.gaia-mobile-v2-app-record-viewtab-container',
+      '.gaia-mobile-v2-view-list-record',
+      '.gaia-mobile-v2-app-indexHeader'
+    ].join(',') + '{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;position:absolute!important;left:-9999px!important}';
+    
+    // 既存のスタイルがあれば削除
+    var existing = document.getElementById('hikari-hide-kintone-ui');
+    if (existing) existing.remove();
+    
     document.head.appendChild(css);
+    
+    // 動的に追加される要素も非表示にする
+    setTimeout(function() {
+      var lists = document.querySelectorAll('.gaia-mobile-v2-viewpanel-recordlist, .recordlist-gaia, .gaia-mobile-v2-app-index-toolbar');
+      lists.forEach(function(el) {
+        el.style.cssText = 'display:none!important;visibility:hidden!important;height:0!important';
+      });
+    }, 100);
+    
+    // さらに遅延して再チェック
+    setTimeout(function() {
+      var lists = document.querySelectorAll('.gaia-mobile-v2-viewpanel-recordlist, .recordlist-gaia, .gaia-mobile-v2-app-index-toolbar');
+      lists.forEach(function(el) {
+        el.style.cssText = 'display:none!important;visibility:hidden!important;height:0!important';
+      });
+    }, 500);
   }
 
+  // ========== 写真拡大表示モーダル ==========
+  function showPhotoModal(fileKey) {
+    if (!fileKey) return;
+    
+    // ローディング表示
+    var modal = document.createElement('div');
+    modal.id = 'hikari-photo-modal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:99999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s';
+    modal.innerHTML = '<div style="color:#d4af37;font-size:14px">読み込み中...</div>';
+    document.body.appendChild(modal);
+    
+    // フェードイン
+    setTimeout(function() { modal.style.opacity = '1'; }, 10);
+    
+    // 画像取得
+    fetch('/k/v1/file.json?fileKey=' + fileKey, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function(r) { return r.blob(); }).then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      
+      modal.innerHTML = '<button style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.1);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:24px;cursor:pointer;z-index:10">&times;</button><img src="' + url + '" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px">';
+      
+      // 閉じる処理
+      var closeModal = function() {
+        modal.style.opacity = '0';
+        setTimeout(function() {
+          modal.remove();
+          URL.revokeObjectURL(url);
+        }, 300);
+      };
+      
+      // 閉じるボタン
+      modal.querySelector('button').addEventListener('click', function(e) {
+        e.stopPropagation();
+        closeModal();
+      });
+      
+      // 背景クリックで閉じる
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+      });
+      
+      // 画像クリックでも閉じる
+      modal.querySelector('img').addEventListener('click', closeModal);
+      
+    }).catch(function() {
+      modal.innerHTML = '<div style="color:#ef4444;font-size:14px">画像の読み込みに失敗しました</div>';
+      setTimeout(function() { modal.remove(); }, 2000);
+    });
+  }
+
+  // ========== データ取得 ==========
   function fetchAllRecords() {
     return new Promise(function(resolve, reject) {
       var records = [];
@@ -162,10 +278,25 @@
 
   function loadReferrerOptions() {
     state.referrerOptions = state.allRecords.map(function(r) {
-      return { id: Utils.getFieldValue(r, '$id'), name: Utils.getFieldValue(r, CONFIG.FIELDS.NAME), company: Utils.getFieldValue(r, CONFIG.FIELDS.COMPANY) };
+      return { 
+        id: Utils.getFieldValue(r, '$id'), 
+        name: Utils.getFieldValue(r, CONFIG.FIELDS.NAME), 
+        company: Utils.getFieldValue(r, CONFIG.FIELDS.COMPANY) 
+      };
     }).filter(function(r) { return r.name; });
   }
 
+  // ========== 重複チェック ==========
+  function isDuplicateName(name) {
+    if (!name) return false;
+    var lower = name.toLowerCase().trim();
+    return state.allRecords.some(function(r) {
+      var n = Utils.getFieldValue(r, CONFIG.FIELDS.NAME);
+      return n && n.toLowerCase().trim() === lower;
+    });
+  }
+
+  // ========== フィルター ==========
   function applyFilters() {
     state.filteredRecords = state.allRecords.filter(function(r) {
       if (state.relationshipFilter !== 'all' && Utils.getFieldValue(r, CONFIG.FIELDS.RELATIONSHIP) !== state.relationshipFilter) return false;
@@ -175,18 +306,23 @@
         var name = Utils.getFieldValue(r, CONFIG.FIELDS.NAME).toLowerCase();
         var kana = Utils.getFieldValue(r, CONFIG.FIELDS.KANA_NAME).toLowerCase();
         var company = Utils.getFieldValue(r, CONFIG.FIELDS.COMPANY).toLowerCase();
-        if (name.indexOf(s) === -1 && kana.indexOf(s) === -1 && company.indexOf(s) === -1) return false;
+        var notes = Utils.getFieldValue(r, CONFIG.FIELDS.NOTES).toLowerCase();
+        // サブテーブルのメモも検索
+        var history = Utils.getFieldValue(r, CONFIG.FIELDS.CONTACT_HISTORY) || [];
+        var historyMemo = history.map(function(h) {
+          return (h.value[CONFIG.FIELDS.CONTACT_MEMO] && h.value[CONFIG.FIELDS.CONTACT_MEMO].value) ? h.value[CONFIG.FIELDS.CONTACT_MEMO].value.toLowerCase() : '';
+        }).join(' ');
+        if (name.indexOf(s) === -1 && kana.indexOf(s) === -1 && company.indexOf(s) === -1 && notes.indexOf(s) === -1 && historyMemo.indexOf(s) === -1) return false;
       }
       return true;
     });
   }
 
-  // ========== 画面描画 ==========
-  
+  // ========== 画面描画：一覧 ==========
   function renderList() {
     var hasFilter = state.relationshipFilter !== 'all' || state.industryFilter !== 'all';
     var html = '<div style="background:linear-gradient(135deg,#d4af37,#b8941f);padding:12px;text-align:center;font-size:16px;font-weight:700;color:#1a1a1a">人脈管理</div>';
-    html += '<div style="padding:10px 12px;display:flex;gap:8px"><input type="search" id="hmp-search" placeholder="名前・会社名で検索..." value="' + Utils.escapeHtml(state.search) + '" style="flex:1;min-width:0;background:#2a2a4a;border:1px solid #3a3a5a;border-radius:6px;padding:8px 10px;font-size:14px;color:#f5f5f5"><button id="hmp-filter-btn" style="background:' + (hasFilter ? '#d4af37;color:#1a1a1a' : '#2a2a4a;color:#d4af37') + ';border:1px solid #3a3a5a;border-radius:6px;padding:8px 12px;font-size:12px;font-weight:600">絞込</button></div>';
+    html += '<div style="padding:10px 12px;display:flex;gap:8px"><input type="search" id="hmp-search" placeholder="名前・会社名・メモで検索..." value="' + Utils.escapeHtml(state.search) + '" style="flex:1;min-width:0;background:#2a2a4a;border:1px solid #3a3a5a;border-radius:6px;padding:8px 10px;font-size:14px;color:#f5f5f5"><button id="hmp-filter-btn" style="background:' + (hasFilter ? '#d4af37;color:#1a1a1a' : '#2a2a4a;color:#d4af37') + ';border:1px solid #3a3a5a;border-radius:6px;padding:8px 12px;font-size:12px;font-weight:600">絞込</button></div>';
     html += '<div style="padding:6px 12px;font-size:11px;color:#888">' + state.filteredRecords.length + '件</div>';
     html += '<div style="padding:0 10px">';
     
@@ -203,17 +339,24 @@
         var color = Utils.getRelationshipColor(rel);
         var lastContact = Utils.getFieldValue(r, CONFIG.FIELDS.LAST_CONTACT);
         var lastType = Utils.getFieldValue(r, CONFIG.FIELDS.LAST_CONTACT_TYPE);
+        var notes = Utils.getFieldValue(r, CONFIG.FIELDS.NOTES);
         var photo = Utils.getFieldValue(r, CONFIG.FIELDS.PHOTO);
         var fileKey = photo && photo.length > 0 ? photo[0].fileKey : '';
         var cached = fileKey ? Utils.fileCache[fileKey] : '';
         var avatarStyle = 'width:40px;height:40px;min-width:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;background:' + color + ';' + (cached ? 'background-image:url(' + cached + ');background-size:cover;color:transparent' : '');
         var contactText = lastContact ? (lastType ? lastType + ' ' : '') + Utils.formatDateShort(lastContact) : '接点なし';
         
+        // メモの一部を表示
+        var shortNotes = notes ? (notes.length > 20 ? notes.substring(0, 20) + '...' : notes) : '';
+        
         html += '<div class="hmp-card" data-id="' + id + '" style="background:#252540;border-radius:8px;padding:10px;margin-bottom:6px;display:flex;align-items:center;gap:10px;border-left:3px solid ' + color + ';cursor:pointer">';
         html += '<div class="hmp-avatar" data-key="' + fileKey + '" style="' + avatarStyle + '">' + Utils.getInitial(name) + '</div>';
         html += '<div style="flex:1;min-width:0;overflow:hidden">';
         html += '<div style="font-size:13px;font-weight:600;color:#f5f5f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + Utils.escapeHtml(name) + '</div>';
         html += '<div style="font-size:10px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + Utils.escapeHtml(company) + (position ? ' / ' + Utils.escapeHtml(position) : '') + '</div>';
+        if (shortNotes) {
+          html += '<div style="font-size:9px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">' + Utils.escapeHtml(shortNotes) + '</div>';
+        }
         html += '<div style="display:flex;align-items:center;gap:4px;margin-top:3px"><span style="font-size:9px;padding:1px 5px;border-radius:6px;font-weight:600;color:#1a1a1a;background:' + color + '">' + (rel || '未設定') + '</span><span style="font-size:9px;color:#888">' + contactText + '</span></div>';
         html += '</div><div style="color:#666;font-size:14px">›</div></div>';
       }
@@ -231,7 +374,12 @@
       renderList();
     });
     document.getElementById('hmp-filter-btn').addEventListener('click', function() { renderFilter(); });
-    document.getElementById('hmp-add-btn').addEventListener('click', function() { state.photoFile = null; state.editRecord = null; renderEdit(null); });
+    document.getElementById('hmp-add-btn').addEventListener('click', function() { 
+      state.photoFile = null; 
+      state.businessCardFile = null;
+      state.editRecord = null; 
+      renderEdit(null); 
+    });
     
     var cards = state.container.querySelectorAll('.hmp-card');
     for (var j = 0; j < cards.length; j++) {
@@ -258,6 +406,7 @@
     }
   }
 
+  // ========== 画面描画：フィルター ==========
   function renderFilter() {
     var relOpts = '<option value="all"' + (state.relationshipFilter === 'all' ? ' selected' : '') + '>すべて</option>';
     for (var i = 0; i < CONFIG.RELATIONSHIP_ORDER.length; i++) {
@@ -292,6 +441,7 @@
     });
   }
 
+  // ========== 画面描画：詳細 ==========
   function renderDetail(record) {
     state.currentRecord = record;
     var name = Utils.getFieldValue(record, CONFIG.FIELDS.NAME);
@@ -299,23 +449,31 @@
     var position = Utils.getFieldValue(record, CONFIG.FIELDS.POSITION);
     var phone = Utils.getFieldValue(record, CONFIG.FIELDS.PHONE);
     var email = Utils.getFieldValue(record, CONFIG.FIELDS.EMAIL);
+    var address = Utils.getFieldValue(record, CONFIG.FIELDS.ADDRESS);
+    var postalCode = Utils.getFieldValue(record, CONFIG.FIELDS.POSTAL_CODE);
+    var hp = Utils.getFieldValue(record, CONFIG.FIELDS.HP);
+    var facebook = Utils.getFieldValue(record, CONFIG.FIELDS.FACEBOOK);
+    var instagram = Utils.getFieldValue(record, CONFIG.FIELDS.INSTAGRAM);
     var rel = Utils.getFieldValue(record, CONFIG.FIELDS.RELATIONSHIP);
     var industry = Utils.getFieldValue(record, CONFIG.FIELDS.INDUSTRY);
     var personality = Utils.getFieldValue(record, CONFIG.FIELDS.PERSONALITY) || [];
     var referrer = Utils.getFieldValue(record, CONFIG.FIELDS.REFERRER);
+    var referrerId = Utils.getFieldValue(record, CONFIG.FIELDS.REFERRER_ID);
     var notes = Utils.getFieldValue(record, CONFIG.FIELDS.NOTES);
     var birthday = Utils.getFieldValue(record, CONFIG.FIELDS.BIRTHDAY);
     var photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
+    var businessCard = Utils.getFieldValue(record, CONFIG.FIELDS.BUSINESS_CARD);
     var history = Utils.getFieldValue(record, CONFIG.FIELDS.CONTACT_HISTORY) || [];
     var color = Utils.getRelationshipColor(rel);
     var fileKey = photo && photo.length > 0 ? photo[0].fileKey : '';
+    var bcFileKey = businessCard && businessCard.length > 0 ? businessCard[0].fileKey : '';
     var cached = fileKey ? Utils.fileCache[fileKey] : '';
     
     var html = '<div style="background:linear-gradient(135deg,#d4af37,#b8941f);padding:12px;display:flex;align-items:center;gap:8px"><button id="hmp-back" style="background:rgba(0,0,0,0.15);border:none;color:#1a1a1a;width:32px;height:32px;border-radius:50%;font-size:14px;cursor:pointer">←</button><div style="flex:1;text-align:center;font-size:16px;font-weight:700;color:#1a1a1a">詳細</div><button id="hmp-edit" style="background:rgba(0,0,0,0.15);border:none;color:#1a1a1a;padding:6px 12px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer">編集</button></div>';
     html += '<div style="padding:12px">';
     
-    // プロフィール
-    var avatarStyle = 'width:56px;height:56px;min-width:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;background:' + color + ';' + (cached ? 'background-image:url(' + cached + ');background-size:cover;color:transparent' : '');
+    // プロフィール（写真タップで拡大可能）
+    var avatarStyle = 'width:56px;height:56px;min-width:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;background:' + color + ';cursor:pointer;' + (cached ? 'background-image:url(' + cached + ');background-size:cover;color:transparent' : '');
     html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><div id="hmp-detail-avatar" data-key="' + fileKey + '" style="' + avatarStyle + '">' + Utils.getInitial(name) + '</div><div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:700;color:#f5f5f5">' + Utils.escapeHtml(name) + '</div><div style="font-size:11px;color:#999;margin-top:2px">' + Utils.escapeHtml(company) + (position ? ' / ' + Utils.escapeHtml(position) : '') + '</div><div style="display:inline-block;font-size:10px;padding:2px 8px;border-radius:8px;font-weight:600;color:#1a1a1a;background:' + color + ';margin-top:4px">' + (rel || '未設定') + '</div></div></div>';
     
     // アクションボタン
@@ -326,12 +484,31 @@
     
     // 基本情報
     html += '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#d4af37;margin-bottom:8px">基本情報</div>';
-    if (phone) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:60px">電話</div><div style="font-size:12px;color:#f5f5f5;flex:1;word-break:break-all">' + Utils.escapeHtml(phone) + '</div></div>';
-    if (email) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:60px">メール</div><div style="font-size:12px;color:#f5f5f5;flex:1;word-break:break-all">' + Utils.escapeHtml(email) + '</div></div>';
-    if (birthday) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:60px">誕生日</div><div style="font-size:12px;color:#f5f5f5;flex:1">' + Utils.formatDate(birthday) + '</div></div>';
-    if (industry) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:60px">業種</div><div style="font-size:12px;color:#f5f5f5;flex:1">' + Utils.escapeHtml(industry) + '</div></div>';
-    if (referrer) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:60px">紹介者</div><div style="font-size:12px;color:#f5f5f5;flex:1">' + Utils.escapeHtml(referrer) + '</div></div>';
+    if (phone) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">電話</div><div style="font-size:12px;color:#f5f5f5;flex:1;word-break:break-all">' + Utils.escapeHtml(phone) + '</div></div>';
+    if (email) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">メール</div><div style="font-size:12px;color:#f5f5f5;flex:1;word-break:break-all">' + Utils.escapeHtml(email) + '</div></div>';
+    if (birthday) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">誕生日</div><div style="font-size:12px;color:#f5f5f5;flex:1">' + Utils.formatDate(birthday) + '</div></div>';
+    if (postalCode || address) {
+      var fullAddress = (postalCode ? '〒' + postalCode + ' ' : '') + (address || '');
+      html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">住所</div><div style="font-size:12px;color:#f5f5f5;flex:1;word-break:break-all">' + Utils.escapeHtml(fullAddress) + '</div></div>';
+    }
+    if (industry) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">業種</div><div style="font-size:12px;color:#f5f5f5;flex:1">' + Utils.escapeHtml(industry) + '</div></div>';
+    if (referrer) {
+      var referrerHtml = Utils.escapeHtml(referrer);
+      if (referrerId) {
+        referrerHtml = '<span id="hmp-referrer-link" data-id="' + referrerId + '" style="color:#d4af37;text-decoration:underline;cursor:pointer">' + referrerHtml + '</span>';
+      }
+      html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">紹介者</div><div style="font-size:12px;color:#f5f5f5;flex:1">' + referrerHtml + '</div></div>';
+    }
     html += '</div>';
+    
+    // SNSリンク
+    if (hp || facebook || instagram) {
+      html += '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#d4af37;margin-bottom:8px">SNS・Web</div>';
+      if (hp) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">HP</div><a href="' + Utils.escapeHtml(hp) + '" target="_blank" style="font-size:12px;color:#3b82f6;flex:1;word-break:break-all;text-decoration:none">' + Utils.escapeHtml(hp) + '</a></div>';
+      if (facebook) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">Facebook</div><a href="' + Utils.escapeHtml(facebook) + '" target="_blank" style="font-size:12px;color:#3b82f6;flex:1;word-break:break-all;text-decoration:none">' + Utils.escapeHtml(facebook) + '</a></div>';
+      if (instagram) html += '<div style="display:flex;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:10px;color:#888;width:70px">Instagram</div><a href="' + Utils.escapeHtml(instagram) + '" target="_blank" style="font-size:12px;color:#3b82f6;flex:1;word-break:break-all;text-decoration:none">' + Utils.escapeHtml(instagram) + '</a></div>';
+      html += '</div>';
+    }
     
     // 個人特性
     if (personality.length > 0) {
@@ -345,6 +522,11 @@
     // メモ
     if (notes) {
       html += '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#d4af37;margin-bottom:8px">メモ</div><div style="font-size:12px;color:#ccc;line-height:1.5;white-space:pre-wrap">' + Utils.escapeHtml(notes) + '</div></div>';
+    }
+    
+    // 名刺写真（タップで拡大）
+    if (bcFileKey) {
+      html += '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#d4af37;margin-bottom:8px">名刺</div><div id="hmp-bc-container" data-key="' + bcFileKey + '" style="background:#252540;border-radius:8px;padding:16px;text-align:center;cursor:pointer"><div style="font-size:11px;color:#888">読み込み中...</div></div></div>';
     }
     
     // 接点履歴
@@ -373,16 +555,64 @@
       Utils.getFileUrl(fileKey).then(function(url) {
         if (url) {
           var avatar = document.getElementById('hmp-detail-avatar');
-          if (avatar) { avatar.style.backgroundImage = 'url(' + url + ')'; avatar.style.backgroundSize = 'cover'; avatar.style.color = 'transparent'; }
+          if (avatar) { 
+            avatar.style.backgroundImage = 'url(' + url + ')'; 
+            avatar.style.backgroundSize = 'cover'; 
+            avatar.style.color = 'transparent'; 
+          }
         }
       });
     }
     
+    // 名刺画像読み込み
+    if (bcFileKey) {
+      Utils.getFileUrl(bcFileKey).then(function(url) {
+        if (url) {
+          var bcContainer = document.getElementById('hmp-bc-container');
+          if (bcContainer) {
+            bcContainer.innerHTML = '<img src="' + url + '" style="max-width:100%;border-radius:4px">';
+          }
+        }
+      });
+    }
+    
+    // イベント
     document.getElementById('hmp-back').addEventListener('click', function() { renderList(); });
-    document.getElementById('hmp-edit').addEventListener('click', function() { state.photoFile = null; renderEdit(record); });
+    document.getElementById('hmp-edit').addEventListener('click', function() { 
+      state.photoFile = null; 
+      state.businessCardFile = null;
+      renderEdit(record); 
+    });
     document.getElementById('hmp-add-contact').addEventListener('click', function() { renderContactForm(record); });
+    
+    // 写真タップで拡大
+    var avatar = document.getElementById('hmp-detail-avatar');
+    if (avatar && fileKey) {
+      avatar.addEventListener('click', function() {
+        showPhotoModal(fileKey);
+      });
+    }
+    
+    // 名刺タップで拡大
+    var bcContainer = document.getElementById('hmp-bc-container');
+    if (bcContainer && bcFileKey) {
+      bcContainer.addEventListener('click', function() {
+        showPhotoModal(bcFileKey);
+      });
+    }
+    
+    // 紹介者リンク
+    var referrerLink = document.getElementById('hmp-referrer-link');
+    if (referrerLink) {
+      referrerLink.addEventListener('click', function() {
+        var rid = referrerLink.getAttribute('data-id');
+        var refRecord = state.allRecords.find(function(r) { return Utils.getFieldValue(r, '$id') === rid; });
+        if (refRecord) renderDetail(refRecord);
+      });
+    }
   }
 
+  // ========== 画面描画：接点追加 ==========
   function renderContactForm(record) {
     state.currentRecord = record;
     var typeOpts = '';
@@ -446,6 +676,7 @@
     });
   }
 
+  // ========== 画面描画：編集 ==========
   function renderEdit(record) {
     state.editRecord = record;
     var isNew = !record;
@@ -455,6 +686,11 @@
     var position = record ? Utils.getFieldValue(record, CONFIG.FIELDS.POSITION) : '';
     var phone = record ? Utils.getFieldValue(record, CONFIG.FIELDS.PHONE) : '';
     var email = record ? Utils.getFieldValue(record, CONFIG.FIELDS.EMAIL) : '';
+    var postalCode = record ? Utils.getFieldValue(record, CONFIG.FIELDS.POSTAL_CODE) : '';
+    var address = record ? Utils.getFieldValue(record, CONFIG.FIELDS.ADDRESS) : '';
+    var hp = record ? Utils.getFieldValue(record, CONFIG.FIELDS.HP) : '';
+    var facebook = record ? Utils.getFieldValue(record, CONFIG.FIELDS.FACEBOOK) : '';
+    var instagram = record ? Utils.getFieldValue(record, CONFIG.FIELDS.INSTAGRAM) : '';
     var birthday = record ? Utils.getFieldValue(record, CONFIG.FIELDS.BIRTHDAY) : '';
     var rel = record ? Utils.getFieldValue(record, CONFIG.FIELDS.RELATIONSHIP) : '';
     var industry = record ? Utils.getFieldValue(record, CONFIG.FIELDS.INDUSTRY) : '';
@@ -480,34 +716,68 @@
       persHtml += '<label style="display:flex;align-items:center;gap:4px;background:#252540;padding:4px 8px;border-radius:4px"><input type="checkbox" name="hmp-pers" value="' + p + '"' + checked + ' style="width:14px;height:14px"><span style="font-size:11px;color:#f5f5f5">' + p + '</span></label>';
     }
     
+    var inputStyle = 'width:100%;background:#252540;border:1px solid #3a3a5a;border-radius:4px;padding:8px 10px;font-size:13px;color:#f5f5f5';
+    
     var html = '<div style="background:linear-gradient(135deg,#d4af37,#b8941f);padding:12px;display:flex;align-items:center;gap:8px"><button id="hmp-cancel" style="background:rgba(0,0,0,0.15);border:none;color:#1a1a1a;padding:6px 12px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer">キャンセル</button><div style="flex:1;text-align:center;font-size:16px;font-weight:700;color:#1a1a1a">' + (isNew ? '新規追加' : '編集') + '</div><button id="hmp-save" style="background:rgba(0,0,0,0.15);border:none;color:#1a1a1a;padding:6px 12px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer">保存</button></div>';
     html += '<div style="padding:12px">';
     
     // 写真
     html += '<div style="text-align:center;margin-bottom:16px"><div id="hmp-photo-preview" style="width:60px;height:60px;border-radius:50%;background:#3a3a5a;display:inline-flex;align-items:center;justify-content:center;font-size:24px;color:#666;margin-bottom:6px;background-size:cover;background-position:center;border:2px solid rgba(212,175,55,0.3)">📷</div><br><button id="hmp-photo-btn" style="background:transparent;border:1px solid rgba(212,175,55,0.5);color:#d4af37;padding:5px 12px;border-radius:12px;font-size:11px;cursor:pointer">写真を変更</button><input type="file" id="hmp-photo-input" accept="image/*" style="display:none"></div>';
     
-    // フォーム
-    var inputStyle = 'width:100%;background:#252540;border:1px solid #3a3a5a;border-radius:4px;padding:8px 10px;font-size:13px;color:#f5f5f5';
+    // 重複警告（新規のみ）
+    if (isNew) {
+      html += '<div id="hmp-duplicate-warning" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#ef4444">⚠️ 同じ名前の人脈が既に登録されています</div>';
+    }
+    
+    // 基本情報
     html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:#d4af37;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(212,175,55,0.2)">基本情報</div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">名前 <span style="color:#ef4444">*</span></div><input type="text" id="hmp-name" value="' + Utils.escapeHtml(name) + '" style="' + inputStyle + '"></div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">ふりがな</div><input type="text" id="hmp-kana" value="' + Utils.escapeHtml(kanaName) + '" style="' + inputStyle + '"></div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">会社名</div><input type="text" id="hmp-company" value="' + Utils.escapeHtml(company) + '" style="' + inputStyle + '"></div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">役職</div><input type="text" id="hmp-position" value="' + Utils.escapeHtml(position) + '" style="' + inputStyle + '"></div></div>';
     
+    // 連絡先
     html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:#d4af37;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(212,175,55,0.2)">連絡先</div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">電話番号</div><input type="tel" id="hmp-phone" value="' + Utils.escapeHtml(phone) + '" style="' + inputStyle + '"></div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">メールアドレス</div><input type="email" id="hmp-email" value="' + Utils.escapeHtml(email) + '" style="' + inputStyle + '"></div>';
+    html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">郵便番号</div><input type="text" id="hmp-postal" placeholder="000-0000" value="' + Utils.escapeHtml(postalCode) + '" style="' + inputStyle + '"></div>';
+    html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">住所</div><input type="text" id="hmp-address" value="' + Utils.escapeHtml(address) + '" style="' + inputStyle + '"></div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">誕生日</div><input type="date" id="hmp-birthday" value="' + birthday + '" style="' + inputStyle + '"></div></div>';
     
+    // SNS
+    html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:#d4af37;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(212,175,55,0.2)">SNS・Web</div>';
+    html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">HP</div><input type="url" id="hmp-hp" placeholder="https://..." value="' + Utils.escapeHtml(hp) + '" style="' + inputStyle + '"></div>';
+    html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">Facebook</div><input type="url" id="hmp-facebook" placeholder="https://facebook.com/..." value="' + Utils.escapeHtml(facebook) + '" style="' + inputStyle + '"></div>';
+    html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">Instagram</div><input type="url" id="hmp-instagram" placeholder="https://instagram.com/..." value="' + Utils.escapeHtml(instagram) + '" style="' + inputStyle + '"></div></div>';
+    
+    // 分類
     html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:#d4af37;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(212,175,55,0.2)">分類</div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">お付き合い度合い</div><select id="hmp-rel" style="' + inputStyle + '">' + relOpts + '</select></div>';
     html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">業種</div><select id="hmp-ind" style="' + inputStyle + '">' + indOpts + '</select></div>';
-    html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">紹介者</div><input type="text" id="hmp-referrer" placeholder="紹介者名を入力..." value="' + Utils.escapeHtml(referrer) + '" style="' + inputStyle + '"><input type="hidden" id="hmp-referrer-id" value="' + referrerId + '"></div></div>';
     
+    // 紹介者（ルックアップ方式）
+    html += '<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;margin-bottom:4px">紹介者</div>';
+    html += '<div style="position:relative">';
+    html += '<input type="text" id="hmp-referrer-search" placeholder="紹介者名を入力して検索..." value="' + Utils.escapeHtml(referrer) + '" style="' + inputStyle + '">';
+    html += '<input type="hidden" id="hmp-referrer-id" value="' + referrerId + '">';
+    html += '<input type="hidden" id="hmp-referrer-name" value="' + Utils.escapeHtml(referrer) + '">';
+    html += '<button type="button" id="hmp-referrer-clear" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.1);border:none;color:#888;width:20px;height:20px;border-radius:50%;font-size:12px;cursor:pointer;display:' + (referrerId ? 'block' : 'none') + '">×</button>';
+    html += '<div id="hmp-referrer-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#252540;border:1px solid #3a3a5a;border-top:none;border-radius:0 0 4px 4px;max-height:200px;overflow-y:auto;z-index:100"></div>';
+    html += '</div></div></div>';
+    
+    // 個人特性
     html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:#d4af37;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(212,175,55,0.2)">個人特性</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + persHtml + '</div></div>';
     
+    // メモ
     html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:#d4af37;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(212,175,55,0.2)">メモ</div><textarea id="hmp-notes" placeholder="メモを入力..." style="' + inputStyle + ';min-height:60px;resize:vertical">' + Utils.escapeHtml(notes) + '</textarea></div>';
     
+    // 名刺写真
+    html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:#d4af37;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(212,175,55,0.2)">名刺写真</div>';
+    html += '<div id="hmp-bc-preview" style="background:#252540;border-radius:6px;padding:12px;text-align:center;margin-bottom:8px"><div style="font-size:11px;color:#666">名刺写真なし</div></div>';
+    html += '<button id="hmp-bc-btn" style="width:100%;background:transparent;border:1px dashed #3a3a5a;border-radius:6px;padding:8px;color:#888;font-size:11px;cursor:pointer">+ 名刺写真を追加</button>';
+    html += '<input type="file" id="hmp-bc-input" accept="image/*" style="display:none"></div>';
+    
+    // 削除ボタン
     if (!isNew) {
       html += '<button id="hmp-delete" style="width:100%;background:transparent;border:1px solid #ef4444;color:#ef4444;padding:10px;border-radius:6px;font-size:12px;cursor:pointer;margin-top:20px">このデータを削除</button>';
     }
@@ -534,10 +804,25 @@
           });
         }
       }
+      
+      // 名刺プレビュー
+      var bc = Utils.getFieldValue(record, CONFIG.FIELDS.BUSINESS_CARD);
+      if (bc && bc.length > 0) {
+        Utils.getFileUrl(bc[0].fileKey).then(function(url) {
+          if (url) {
+            var bcPreview = document.getElementById('hmp-bc-preview');
+            if (bcPreview) {
+              bcPreview.innerHTML = '<img src="' + url + '" style="max-width:100%;border-radius:4px">';
+            }
+          }
+        });
+      }
     }
     
+    // イベント
     document.getElementById('hmp-cancel').addEventListener('click', function() {
       state.photoFile = null;
+      state.businessCardFile = null;
       if (state.editRecord) renderDetail(state.editRecord);
       else renderList();
     });
@@ -558,11 +843,121 @@
       }
     });
     
+    // 名刺写真
+    document.getElementById('hmp-bc-btn').addEventListener('click', function() { document.getElementById('hmp-bc-input').click(); });
+    document.getElementById('hmp-bc-input').addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (file) {
+        state.businessCardFile = file;
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          var preview = document.getElementById('hmp-bc-preview');
+          preview.innerHTML = '<img src="' + ev.target.result + '" style="max-width:100%;border-radius:4px">';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+    
+    // 重複チェック（新規のみ）
+    if (isNew) {
+      var nameInput = document.getElementById('hmp-name');
+      var warningDiv = document.getElementById('hmp-duplicate-warning');
+      var checkTimeout = null;
+      nameInput.addEventListener('input', function() {
+        if (checkTimeout) clearTimeout(checkTimeout);
+        checkTimeout = setTimeout(function() {
+          var val = nameInput.value.trim();
+          if (val && isDuplicateName(val)) {
+            warningDiv.style.display = 'block';
+          } else {
+            warningDiv.style.display = 'none';
+          }
+        }, 300);
+      });
+    }
+    
+    // 紹介者ルックアップ
+    var refSearch = document.getElementById('hmp-referrer-search');
+    var refIdInput = document.getElementById('hmp-referrer-id');
+    var refNameInput = document.getElementById('hmp-referrer-name');
+    var refClearBtn = document.getElementById('hmp-referrer-clear');
+    var refDropdown = document.getElementById('hmp-referrer-dropdown');
+    var refTimeout = null;
+    
+    refSearch.addEventListener('input', function() {
+      var query = refSearch.value.trim().toLowerCase();
+      if (refTimeout) clearTimeout(refTimeout);
+      
+      refTimeout = setTimeout(function() {
+        if (query.length < 2) {
+          refDropdown.style.display = 'none';
+          return;
+        }
+        
+        var filtered = state.referrerOptions.filter(function(r) {
+          return r.name.toLowerCase().indexOf(query) !== -1 || 
+                 (r.company && r.company.toLowerCase().indexOf(query) !== -1);
+        }).slice(0, 20);
+        
+        if (filtered.length === 0) {
+          refDropdown.innerHTML = '<div style="padding:12px;text-align:center;color:#888;font-size:11px">該当する紹介者が見つかりません</div>';
+        } else {
+          var html = '';
+          for (var i = 0; i < filtered.length; i++) {
+            var item = filtered[i];
+            html += '<div class="hmp-ref-item" data-id="' + item.id + '" data-name="' + Utils.escapeHtml(item.name) + '" style="padding:10px 12px;border-bottom:1px solid #3a3a5a;cursor:pointer"><div style="font-size:12px;color:#f5f5f5">' + Utils.escapeHtml(item.name) + '</div><div style="font-size:10px;color:#888">' + (item.company ? Utils.escapeHtml(item.company) : '会社名なし') + '</div></div>';
+          }
+          refDropdown.innerHTML = html;
+          
+          // 選択イベント
+          var items = refDropdown.querySelectorAll('.hmp-ref-item');
+          for (var j = 0; j < items.length; j++) {
+            (function(item) {
+              item.addEventListener('click', function() {
+                var id = item.getAttribute('data-id');
+                var name = item.getAttribute('data-name');
+                refSearch.value = name;
+                refIdInput.value = id;
+                refNameInput.value = name;
+                refDropdown.style.display = 'none';
+                refClearBtn.style.display = 'block';
+              });
+            })(items[j]);
+          }
+        }
+        
+        refDropdown.style.display = 'block';
+      }, 200);
+    });
+    
+    refSearch.addEventListener('focus', function() {
+      if (refSearch.value.length >= 2) {
+        refDropdown.style.display = 'block';
+      }
+    });
+    
+    refClearBtn.addEventListener('click', function() {
+      refSearch.value = '';
+      refIdInput.value = '';
+      refNameInput.value = '';
+      refClearBtn.style.display = 'none';
+      refDropdown.style.display = 'none';
+    });
+    
+    // ドロップダウン外クリックで閉じる
+    document.addEventListener('click', function(e) {
+      if (!refSearch.contains(e.target) && !refDropdown.contains(e.target)) {
+        refDropdown.style.display = 'none';
+      }
+    });
+    
+    // 削除ボタン
     if (!isNew) {
       document.getElementById('hmp-delete').addEventListener('click', function() { deleteRecord(); });
     }
   }
 
+  // ========== 保存処理 ==========
   function saveRecord() {
     var isNew = !state.editRecord;
     var name = document.getElementById('hmp-name').value.trim();
@@ -575,41 +970,65 @@
     data[CONFIG.FIELDS.POSITION] = { value: document.getElementById('hmp-position').value };
     data[CONFIG.FIELDS.PHONE] = { value: document.getElementById('hmp-phone').value };
     data[CONFIG.FIELDS.EMAIL] = { value: document.getElementById('hmp-email').value };
+    data[CONFIG.FIELDS.POSTAL_CODE] = { value: document.getElementById('hmp-postal').value };
+    data[CONFIG.FIELDS.ADDRESS] = { value: document.getElementById('hmp-address').value };
+    data[CONFIG.FIELDS.HP] = { value: document.getElementById('hmp-hp').value };
+    data[CONFIG.FIELDS.FACEBOOK] = { value: document.getElementById('hmp-facebook').value };
+    data[CONFIG.FIELDS.INSTAGRAM] = { value: document.getElementById('hmp-instagram').value };
     data[CONFIG.FIELDS.BIRTHDAY] = { value: document.getElementById('hmp-birthday').value };
     data[CONFIG.FIELDS.RELATIONSHIP] = { value: document.getElementById('hmp-rel').value };
     data[CONFIG.FIELDS.INDUSTRY] = { value: document.getElementById('hmp-ind').value };
-    data[CONFIG.FIELDS.REFERRER] = { value: document.getElementById('hmp-referrer').value };
-    data[CONFIG.FIELDS.REFERRER_ID] = { value: document.getElementById('hmp-referrer-id').value };
     data[CONFIG.FIELDS.NOTES] = { value: document.getElementById('hmp-notes').value };
     
+    // 紹介者
     var refId = document.getElementById('hmp-referrer-id').value;
+    var refName = document.getElementById('hmp-referrer-name').value || document.getElementById('hmp-referrer-search').value;
+    data[CONFIG.FIELDS.REFERRER] = { value: refName };
+    data[CONFIG.FIELDS.REFERRER_ID] = { value: refId };
     data[CONFIG.FIELDS.REFERRER_LINK] = { value: refId ? location.origin + '/k/' + CONFIG.APP_ID + '/show#record=' + refId : '' };
     
+    // 個人特性
     var persChecks = document.querySelectorAll('input[name="hmp-pers"]:checked');
     var persValues = [];
     for (var i = 0; i < persChecks.length; i++) persValues.push(persChecks[i].value);
     data[CONFIG.FIELDS.PERSONALITY] = { value: persValues };
     
-    var savePromise;
+    // ファイルアップロード
+    var uploadPromises = [];
+    
+    // 顔写真
     if (state.photoFile) {
-      var formData = new FormData();
-      formData.append('__REQUEST_TOKEN__', kintone.getRequestToken());
-      formData.append('file', state.photoFile);
-      savePromise = fetch('/k/v1/file.json', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: formData })
-        .then(function(r) { return r.json(); })
-        .then(function(resp) { data[CONFIG.FIELDS.PHOTO] = { value: [{ fileKey: resp.fileKey }] }; return data; });
-    } else {
-      savePromise = Promise.resolve(data);
+      var photoFormData = new FormData();
+      photoFormData.append('__REQUEST_TOKEN__', kintone.getRequestToken());
+      photoFormData.append('file', state.photoFile);
+      uploadPromises.push(
+        fetch('/k/v1/file.json', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: photoFormData })
+          .then(function(r) { return r.json(); })
+          .then(function(resp) { data[CONFIG.FIELDS.PHOTO] = { value: [{ fileKey: resp.fileKey }] }; })
+      );
     }
     
-    savePromise.then(function(finalData) {
-      if (isNew) return kintone.api('/k/v1/record', 'POST', { app: CONFIG.APP_ID, record: finalData });
+    // 名刺写真
+    if (state.businessCardFile) {
+      var bcFormData = new FormData();
+      bcFormData.append('__REQUEST_TOKEN__', kintone.getRequestToken());
+      bcFormData.append('file', state.businessCardFile);
+      uploadPromises.push(
+        fetch('/k/v1/file.json', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: bcFormData })
+          .then(function(r) { return r.json(); })
+          .then(function(resp) { data[CONFIG.FIELDS.BUSINESS_CARD] = { value: [{ fileKey: resp.fileKey }] }; })
+      );
+    }
+    
+    Promise.all(uploadPromises).then(function() {
+      if (isNew) return kintone.api('/k/v1/record', 'POST', { app: CONFIG.APP_ID, record: data });
       else {
         var id = Utils.getFieldValue(state.editRecord, '$id');
-        return kintone.api('/k/v1/record', 'PUT', { app: CONFIG.APP_ID, id: id, record: finalData });
+        return kintone.api('/k/v1/record', 'PUT', { app: CONFIG.APP_ID, id: id, record: data });
       }
     }).then(function() {
       state.photoFile = null;
+      state.businessCardFile = null;
       return fetchAllRecords();
     }).then(function(records) {
       state.allRecords = records;
@@ -622,6 +1041,7 @@
     });
   }
 
+  // ========== 削除処理 ==========
   function deleteRecord() {
     if (!confirm('本当にこのデータを削除しますか？')) return;
     var id = Utils.getFieldValue(state.editRecord, '$id');
@@ -638,8 +1058,9 @@
     });
   }
 
+  // ========== 初期化 ==========
   function init(el) {
-    console.log('🌟 HIKARI v8 initializing...');
+    console.log('🌟 HIKARI v9 initializing...');
     hideKintoneUI();
     state.container = el;
     el.style.cssText = 'display:block;min-height:100vh;background:#1a1a2e;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;color:#f5f5f5;font-size:14px;line-height:1.5;padding-bottom:20px';
@@ -651,13 +1072,14 @@
       state.filteredRecords = state.allRecords.slice();
       console.log('✅ ' + state.allRecords.length + '件のデータを取得');
       renderList();
-      console.log('✅ HIKARI v8 initialized');
+      console.log('✅ HIKARI v9 initialized');
     }).catch(function(e) {
       console.error('❌ 初期化エラー:', e);
       el.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 16px;gap:12px"><div style="font-size:32px;margin-bottom:12px">⚠️</div><div style="color:#d4af37;font-size:12px">データの取得に失敗しました</div></div>';
     });
   }
 
+  // ========== イベント登録 ==========
   kintone.events.on('mobile.app.record.index.show', function(event) {
     var el = kintone.mobile.app.getHeaderSpaceElement();
     if (!el) return event;
@@ -665,5 +1087,5 @@
     return event;
   });
 
-  console.log('🌟 HIKARI v8 script loaded');
+  console.log('🌟 HIKARI v9 script loaded');
 })();
