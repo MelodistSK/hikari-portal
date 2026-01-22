@@ -476,6 +476,23 @@
       color: #888;
     }
     
+    .hikari-card-personality {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .hikari-card-personality-tag {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(139, 92, 246, 0.15);
+      color: #a78bfa;
+    }
+    
     /* ========== モーダル ========== */
     .hikari-modal-overlay {
       position: fixed;
@@ -1129,7 +1146,7 @@
       color: #666;
     }
     
-    /* ========== パーソナリティ評価 ========== */
+    /* ========== 個人特性 ========== */
     .hikari-personality-grid {
       display: flex;
       flex-wrap: wrap;
@@ -1221,7 +1238,7 @@
     }
   };
   
-  // パーソナリティ評価選択肢を読み込み
+  // 個人特性選択肢を読み込み
   const loadPersonalityOptions = async () => {
     try {
       const formFields = await kintone.api('/k/v1/app/form/fields', 'GET', {
@@ -1236,7 +1253,7 @@
             .map(([key]) => key) : [];
       }
     } catch (error) {
-      console.error('パーソナリティ評価選択肢の取得に失敗:', error);
+      console.error('個人特性選択肢の取得に失敗:', error);
     }
   };
   
@@ -1388,6 +1405,7 @@
       let lastContact = Utils.getFieldValue(record, CONFIG.FIELDS.LAST_CONTACT);
       let lastContactType = Utils.getFieldValue(record, CONFIG.FIELDS.LAST_CONTACT_TYPE);
       const photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
+      const personality = Utils.getFieldValue(record, CONFIG.FIELDS.PERSONALITY) || [];
       const color = Utils.getRelationshipColor(relationship);
       
       // last_contact_date または last_contact_type が空ならサブテーブルから取得
@@ -1442,6 +1460,11 @@
                 : '接点なし'}
             </span>
           </div>
+          ${personality.length > 0 ? `
+          <div class="hikari-card-personality">
+            ${personality.map(p => `<span class="hikari-card-personality-tag">${Utils.escapeHtml(p)}</span>`).join('')}
+          </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -1866,7 +1889,7 @@
     const hasPhoto = photo && photo.length > 0;
     const fileKey = hasPhoto ? photo[0].fileKey : '';
     
-    // パーソナリティ評価の現在値（配列）
+    // 個人特性の現在値（配列）
     const currentPersonality = record ? Utils.getFieldValue(record, CONFIG.FIELDS.PERSONALITY) : [];
     const personalityArray = Array.isArray(currentPersonality) ? currentPersonality : [];
     
@@ -1994,10 +2017,10 @@
               </div>
             </div>
             
-            <!-- パーソナリティ評価 -->
+            <!-- 個人特性 -->
             ${personalityOptions.length > 0 ? `
             <div class="hikari-form-group">
-              <label class="hikari-form-label">パーソナリティ評価</label>
+              <label class="hikari-form-label">個人特性</label>
               <div class="hikari-personality-grid">
                 ${personalityOptions.map(opt => `
                   <div class="hikari-personality-item">
@@ -2230,7 +2253,7 @@
         data[CONFIG.FIELDS.REFERRER_LINK] = { value: '' };
       }
       
-      // パーソナリティ評価（チェックボックス）
+      // 個人特性（チェックボックス）
       const personalityChecks = modal.querySelectorAll('input[name="personality"]:checked');
       const personalityValues = Array.from(personalityChecks).map(cb => cb.value);
       if (personalityOptions.length > 0) {
@@ -2360,7 +2383,7 @@
     
     injectStyles();
     
-    // フォームオプションを読み込み（業種、パーソナリティ評価、接点種別）
+    // フォームオプションを読み込み（業種、個人特性、接点種別）
     await Promise.all([
       loadIndustryOptions(),
       loadPersonalityOptions(),
