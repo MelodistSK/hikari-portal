@@ -1524,18 +1524,41 @@
             }
           });
           
-          // レコード更新
+          // 最新接点日・種別を計算（サブテーブル全体から）
+          let latestDate = '';
+          let latestType = '';
+          currentHistory.forEach(row => {
+            const d = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+            if (d && d > latestDate) {
+              latestDate = d;
+              latestType = row.value[CONFIG.FIELDS.CONTACT_TYPE]?.value || '';
+            }
+          });
+          
+          // 接点回数
+          const newCount = currentHistory.length;
+          
+          // レコード更新（サブテーブル + 集計フィールド）
           await kintone.api('/k/v1/record', 'PUT', {
             app: CONFIG.APP_ID,
             id: id,
             record: {
               [CONFIG.FIELDS.CONTACT_HISTORY]: {
                 value: currentHistory
+              },
+              [CONFIG.FIELDS.LAST_CONTACT]: {
+                value: latestDate
+              },
+              [CONFIG.FIELDS.LAST_CONTACT_TYPE]: {
+                value: latestType
+              },
+              [CONFIG.FIELDS.CONTACT_COUNT]: {
+                value: newCount
               }
             }
           });
           
-          console.log('✅ 接点履歴追加成功');
+          console.log('✅ 接点履歴追加成功', { latestDate, latestType, newCount });
           
           // モーダルを閉じてデータ再読み込み
           closeModal();
