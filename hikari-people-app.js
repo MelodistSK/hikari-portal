@@ -333,6 +333,33 @@
       color: #f7e7ce;
     }
     
+    .hikari-referrer-filter-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    
+    .hikari-referrer-filter {
+      width: 160px;
+      padding-right: 30px !important;
+    }
+    
+    .hikari-referrer-filter-clear {
+      position: absolute;
+      right: 10px;
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: none;
+      line-height: 1;
+    }
+    
+    .hikari-referrer-filter-clear.show {
+      display: block;
+    }
+    
     .hikari-btn-add {
       background: linear-gradient(135deg, #d4af37, #b8962e);
       border: none;
@@ -1198,6 +1225,8 @@
   let filteredRecords = [];
   let currentFilter = 'all';
   let currentSearch = '';
+  let currentIndustryFilter = 'all';
+  let currentReferrerFilter = '';
   
   // フォームオプション（動的に読み込み）
   let referrerOptions = [];
@@ -1325,13 +1354,41 @@
         if (rel !== currentFilter) return false;
       }
       
+      // 業種フィルター
+      if (currentIndustryFilter !== 'all') {
+        const industry = Utils.getFieldValue(record, CONFIG.FIELDS.INDUSTRY);
+        if (industry !== currentIndustryFilter) return false;
+      }
+      
+      // 紹介者フィルター
+      if (currentReferrerFilter) {
+        const referrer = Utils.getFieldValue(record, CONFIG.FIELDS.REFERRER).toLowerCase();
+        const referrerId = Utils.getFieldValue(record, CONFIG.FIELDS.REFERRER_ID);
+        const filterLower = currentReferrerFilter.toLowerCase();
+        if (!referrer.includes(filterLower) && referrerId !== currentReferrerFilter) {
+          return false;
+        }
+      }
+      
       // 検索フィルター
       if (currentSearch) {
         const name = Utils.getFieldValue(record, CONFIG.FIELDS.NAME).toLowerCase();
         const kana = Utils.getFieldValue(record, CONFIG.FIELDS.KANA_NAME).toLowerCase();
         const company = Utils.getFieldValue(record, CONFIG.FIELDS.COMPANY).toLowerCase();
+        const memo = Utils.getFieldValue(record, CONFIG.FIELDS.NOTES).toLowerCase();
+        
+        // サブテーブル内のcontact_memoも検索対象に
+        const contactHistory = Utils.getFieldValue(record, CONFIG.FIELDS.CONTACT_HISTORY) || [];
+        const contactMemos = contactHistory
+          .map(row => (row.value[CONFIG.FIELDS.CONTACT_MEMO]?.value || '').toLowerCase())
+          .join(' ');
+        
         const search = currentSearch.toLowerCase();
-        if (!name.includes(search) && !kana.includes(search) && !company.includes(search)) {
+        if (!name.includes(search) && 
+            !kana.includes(search) && 
+            !company.includes(search) && 
+            !memo.includes(search) && 
+            !contactMemos.includes(search)) {
           return false;
         }
       }
@@ -1360,11 +1417,19 @@
           <span class="hikari-people-count" id="hikari-people-count"></span>
         </div>
         <div class="hikari-people-controls">
-          <input type="text" class="hikari-search-box" id="hikari-search" placeholder="🔍 名前・会社名で検索...">
+          <input type="text" class="hikari-search-box" id="hikari-search" placeholder="🔍 名前・会社名・メモで検索...">
           <select class="hikari-filter-select" id="hikari-filter">
-            <option value="all">すべて</option>
+            <option value="all">お付き合い度合い</option>
             ${CONFIG.RELATIONSHIP_ORDER.map(rel => `<option value="${rel}">${rel}</option>`).join('')}
           </select>
+          <select class="hikari-filter-select" id="hikari-industry-filter">
+            <option value="all">業種</option>
+            ${industryOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+          </select>
+          <div class="hikari-referrer-filter-container">
+            <input type="text" class="hikari-search-box hikari-referrer-filter" id="hikari-referrer-filter" placeholder="紹介者で絞り込み...">
+            <button type="button" class="hikari-referrer-filter-clear" id="hikari-referrer-filter-clear">×</button>
+          </div>
           <button class="hikari-btn-add" id="hikari-btn-add">
             <span>＋</span>
             <span>新規追加</span>
@@ -2406,6 +2471,39 @@
     
     document.getElementById('hikari-filter').addEventListener('change', (e) => {
       currentFilter = e.target.value;
+      applyFilters();
+    });
+    
+    document.getElementById('hikari-industry-filter').addEventListener('change', (e) => {
+      currentIndustryFilter = e.target.value;
+      applyFilters();
+    });
+    
+    // 紹介者フィルター
+    const referrerFilterInput = document.getElementById('hikari-referrer-filter');
+    const referrerFilterClear = document.getElementById('hikari-referrer-filter-clear');
+    let referrerFilterTimeout = null;
+    
+    referrerFilterInput.addEventListener('input', (e) => {
+      const value = e.target.value;
+      if (referrerFilterTimeout) clearTimeout(referrerFilterTimeout);
+      
+      referrerFilterTimeout = setTimeout(() => {
+        currentReferrerFilter = value;
+        applyFilters();
+        
+        if (value) {
+          referrerFilterClear.classList.add('show');
+        } else {
+          referrerFilterClear.classList.remove('show');
+        }
+      }, 300);
+    });
+    
+    referrerFilterClear.addEventListener('click', () => {
+      referrerFilterInput.value = '';
+      currentReferrerFilter = '';
+      referrerFilterClear.classList.remove('show');
       applyFilters();
     });
     
