@@ -35,7 +35,13 @@
       PHOTO: '顔写真',
       BUSINESS_CARD: '名刺写真',
       INDUSTRY: '業種',
+      // サブテーブル
+      CONTACT_HISTORY: 'contact_history',
+      CONTACT_DATE: 'contact_date',
+      CONTACT_TYPE: 'contact_type',
+      CONTACT_MEMO: 'contact_memo',
     },
+    CONTACT_TYPES: ['対面', '電話', 'メール', 'LINE', 'SNS', 'その他'],
     RELATIONSHIP_COLORS: {
       '1.プライム': '#d4af37',
       '2.パワー': '#c0c0c0',
@@ -852,6 +858,182 @@
         grid-template-columns: 1fr;
       }
     }
+    
+    /* ========== 接点履歴 ========== */
+    .hikari-history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .hikari-history-title {
+      font-size: 0.9rem;
+      color: #d4af37;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+      flex: 1;
+    }
+    
+    .hikari-btn-add-history {
+      background: linear-gradient(135deg, #d4af37, #b8962e);
+      color: #0a0a0a;
+      border: none;
+      padding: 6px 15px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-left: 15px;
+      transition: all 0.3s ease;
+    }
+    
+    .hikari-btn-add-history:hover {
+      box-shadow: 0 3px 10px rgba(212, 175, 55, 0.4);
+    }
+    
+    .hikari-history-list {
+      max-height: 200px;
+      overflow-y: auto;
+      padding-right: 5px;
+    }
+    
+    .hikari-history-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .hikari-history-list::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px;
+    }
+    
+    .hikari-history-list::-webkit-scrollbar-thumb {
+      background: rgba(212, 175, 55, 0.3);
+      border-radius: 3px;
+    }
+    
+    .hikari-history-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 15px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .hikari-history-item:last-child {
+      border-bottom: none;
+    }
+    
+    .hikari-history-date {
+      font-size: 0.85rem;
+      color: #666;
+      min-width: 90px;
+    }
+    
+    .hikari-history-type {
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      border-radius: 15px;
+      background: rgba(212, 175, 55, 0.15);
+      color: #d4af37;
+      min-width: 60px;
+      text-align: center;
+    }
+    
+    .hikari-history-memo {
+      flex: 1;
+      font-size: 0.9rem;
+      color: #f7e7ce;
+      line-height: 1.5;
+    }
+    
+    .hikari-history-empty {
+      color: #666;
+      font-size: 0.9rem;
+      padding: 20px 0;
+      text-align: center;
+    }
+    
+    /* 接点追加フォーム */
+    .hikari-history-form {
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      border: 1px solid rgba(212, 175, 55, 0.2);
+    }
+    
+    .hikari-history-form-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 12px;
+    }
+    
+    .hikari-history-form-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .hikari-history-form-group {
+      flex: 1;
+    }
+    
+    .hikari-history-form-label {
+      display: block;
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 5px;
+    }
+    
+    .hikari-history-input,
+    .hikari-history-select,
+    .hikari-history-textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #f7e7ce;
+      font-size: 0.9rem;
+    }
+    
+    .hikari-history-textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    
+    .hikari-history-input:focus,
+    .hikari-history-select:focus,
+    .hikari-history-textarea:focus {
+      outline: none;
+      border-color: #d4af37;
+    }
+    
+    .hikari-history-form-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    
+    .hikari-btn-history-save {
+      background: linear-gradient(135deg, #d4af37, #b8962e);
+      color: #0a0a0a;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .hikari-btn-history-cancel {
+      background: rgba(255,255,255,0.1);
+      color: #888;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
     `;
     document.head.appendChild(style);
   };
@@ -1062,6 +1244,7 @@
     const birthday = Utils.getFieldValue(record, CONFIG.FIELDS.BIRTHDAY);
     const notes = Utils.getFieldValue(record, CONFIG.FIELDS.NOTES);
     const photo = Utils.getFieldValue(record, CONFIG.FIELDS.PHOTO);
+    const contactHistory = Utils.getFieldValue(record, CONFIG.FIELDS.CONTACT_HISTORY) || [];
     const color = Utils.getRelationshipColor(relationship);
     
     const hasPhoto = photo && photo.length > 0;
@@ -1156,6 +1339,37 @@
             </div>
           </div>
           
+          <div class="hikari-detail-section">
+            <div class="hikari-history-header">
+              <div class="hikari-history-title">接点履歴</div>
+              <button class="hikari-btn-add-history" id="hikari-btn-add-history">＋ 接点追加</button>
+            </div>
+            <div id="hikari-history-form-container"></div>
+            <div class="hikari-history-list" id="hikari-history-list">
+              ${contactHistory.length > 0 
+                ? contactHistory
+                    .sort((a, b) => {
+                      const dateA = a.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+                      const dateB = b.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+                      return dateB.localeCompare(dateA);
+                    })
+                    .map(row => {
+                      const date = row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '';
+                      const type = row.value[CONFIG.FIELDS.CONTACT_TYPE]?.value || '';
+                      const memo = row.value[CONFIG.FIELDS.CONTACT_MEMO]?.value || '';
+                      return `
+                        <div class="hikari-history-item">
+                          <span class="hikari-history-date">${Utils.formatDate(date)}</span>
+                          <span class="hikari-history-type">${Utils.escapeHtml(type)}</span>
+                          <span class="hikari-history-memo">${Utils.escapeHtml(memo) || '-'}</span>
+                        </div>
+                      `;
+                    }).join('')
+                : '<div class="hikari-history-empty">接点履歴がありません</div>'
+              }
+            </div>
+          </div>
+          
           <div class="hikari-detail-actions">
             <button class="hikari-btn hikari-btn-primary" id="hikari-btn-edit">編集</button>
             <button class="hikari-btn hikari-btn-secondary" id="hikari-btn-kintone">kintoneで開く</button>
@@ -1221,6 +1435,118 @@
         }
       });
     }
+    
+    // 接点追加ボタン
+    const addHistoryBtn = modal.querySelector('#hikari-btn-add-history');
+    const formContainer = modal.querySelector('#hikari-history-form-container');
+    const historyList = modal.querySelector('#hikari-history-list');
+    
+    addHistoryBtn.addEventListener('click', () => {
+      // フォームがすでにあれば何もしない
+      if (formContainer.querySelector('.hikari-history-form')) return;
+      
+      // 今日の日付をデフォルト値に
+      const today = new Date().toISOString().split('T')[0];
+      
+      formContainer.innerHTML = `
+        <div class="hikari-history-form">
+          <div class="hikari-history-form-row">
+            <div class="hikari-history-form-group">
+              <label class="hikari-history-form-label">接点日</label>
+              <input type="date" class="hikari-history-input" id="new-contact-date" value="${today}">
+            </div>
+            <div class="hikari-history-form-group">
+              <label class="hikari-history-form-label">種別</label>
+              <select class="hikari-history-select" id="new-contact-type">
+                ${CONFIG.CONTACT_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="hikari-history-form-row">
+            <div class="hikari-history-form-group">
+              <label class="hikari-history-form-label">メモ</label>
+              <textarea class="hikari-history-textarea" id="new-contact-memo" placeholder="接点の内容を入力..."></textarea>
+            </div>
+          </div>
+          <div class="hikari-history-form-actions">
+            <button type="button" class="hikari-btn-history-cancel" id="cancel-history">キャンセル</button>
+            <button type="button" class="hikari-btn-history-save" id="save-history">追加</button>
+          </div>
+        </div>
+      `;
+      
+      // キャンセルボタン
+      formContainer.querySelector('#cancel-history').addEventListener('click', () => {
+        formContainer.innerHTML = '';
+      });
+      
+      // 追加ボタン
+      formContainer.querySelector('#save-history').addEventListener('click', async () => {
+        const newDate = formContainer.querySelector('#new-contact-date').value;
+        const newType = formContainer.querySelector('#new-contact-type').value;
+        const newMemo = formContainer.querySelector('#new-contact-memo').value;
+        
+        if (!newDate) {
+          alert('接点日を入力してください');
+          return;
+        }
+        
+        // 保存中表示
+        const saveBtn = formContainer.querySelector('#save-history');
+        saveBtn.textContent = '保存中...';
+        saveBtn.disabled = true;
+        
+        try {
+          // 現在のサブテーブルデータに新しい行を追加
+          const currentHistory = contactHistory.map(row => ({
+            id: row.id,
+            value: {
+              [CONFIG.FIELDS.CONTACT_DATE]: { value: row.value[CONFIG.FIELDS.CONTACT_DATE]?.value || '' },
+              [CONFIG.FIELDS.CONTACT_TYPE]: { value: row.value[CONFIG.FIELDS.CONTACT_TYPE]?.value || '' },
+              [CONFIG.FIELDS.CONTACT_MEMO]: { value: row.value[CONFIG.FIELDS.CONTACT_MEMO]?.value || '' },
+            }
+          }));
+          
+          // 新しい行を追加
+          currentHistory.push({
+            value: {
+              [CONFIG.FIELDS.CONTACT_DATE]: { value: newDate },
+              [CONFIG.FIELDS.CONTACT_TYPE]: { value: newType },
+              [CONFIG.FIELDS.CONTACT_MEMO]: { value: newMemo },
+            }
+          });
+          
+          // レコード更新
+          await kintone.api('/k/v1/record', 'PUT', {
+            app: CONFIG.APP_ID,
+            id: id,
+            record: {
+              [CONFIG.FIELDS.CONTACT_HISTORY]: {
+                value: currentHistory
+              }
+            }
+          });
+          
+          console.log('✅ 接点履歴追加成功');
+          
+          // モーダルを閉じてデータ再読み込み
+          closeModal();
+          await loadAndRender();
+          
+          // 再度詳細モーダルを開く
+          const updatedRecord = allRecords.find(r => Utils.getFieldValue(r, '$id') === id);
+          if (updatedRecord) {
+            showDetailModal(updatedRecord);
+          }
+          
+        } catch (err) {
+          console.error('❌ 接点追加エラー:', err);
+          alert('接点の追加に失敗しました');
+          saveBtn.textContent = '追加';
+          saveBtn.disabled = false;
+        }
+      });
+    });
   };
 
   // ========================================
