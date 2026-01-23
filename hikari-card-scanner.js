@@ -2940,6 +2940,7 @@ const extractBusinessCardWithClaudeVision = async (frontImageDataURL, backImageD
   });
 
   try {
+    console.log('CLAUDE_API_KEY:', CLAUDE_API_KEY ? CLAUDE_API_KEY.substring(0, 25) + '...' : '未定義');
     const requestBody = JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1500,
