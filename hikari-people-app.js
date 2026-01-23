@@ -876,15 +876,12 @@
     }
     
     /* ========== kintone標準UI非表示 ========== */
-    .gaia-argoui-app-index-pager,
-    .gaia-argoui-app-toolbar,
-    .gaia-argoui-app-menu,
-    .recordlist-header-gaia,
-    .recordlist-gaia,
-    .gaia-argoui-appindex-toolbar,
-    .gaia-argoui-app-header-buttons {
-      display: none !important;
-    }
+.gaia-argoui-app-index-pager,
+.recordlist-header-gaia,
+.recordlist-gaia,
+.gaia-argoui-appindex-toolbar {
+  display: none !important;
+}
     
     /* ========== レスポンシブ ========== */
     @media (max-width: 768px) {
