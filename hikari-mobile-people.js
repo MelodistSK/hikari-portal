@@ -21,6 +21,7 @@
   
   const CONFIG = {
     APP_ID: kintone.mobile.app.getId() || 6,
+    VIEW_ID: 6532674,  // カード一覧用カスタムビューのID
     FIELDS: {
       NAME: 'name',
       KANA_NAME: 'kananame',
@@ -2487,6 +2488,11 @@
   // ========================================
   
   kintone.events.on('mobile.app.record.index.show', (event) => {
+    // 指定したカスタムビューの場合のみ実行
+    if (event.viewId !== CONFIG.VIEW_ID) {
+      return event;
+    }
+    
     const el = kintone.mobile.app.getHeaderSpaceElement();
     if (!el) return event;
     
