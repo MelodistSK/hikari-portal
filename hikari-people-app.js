@@ -11,7 +11,9 @@
   // ========================================
   
   const CONFIG = {
-    APP_ID: 6,
+  APP_ID: 6,
+  VIEW_ID: 6532674,
+  FIELDS: {
     FIELDS: {
       NAME: 'name',
       KANA_NAME: 'kananame',
@@ -874,14 +876,6 @@
     .hikari-form-photo-preview[data-file-key]:not([data-file-key=""]) {
       cursor: zoom-in;
     }
-    
-    /* ========== kintone標準UI非表示 ========== */
-.gaia-argoui-app-index-pager,
-.recordlist-header-gaia,
-.recordlist-gaia,
-.gaia-argoui-appindex-toolbar {
-  display: none !important;
-}
     
     /* ========== レスポンシブ ========== */
     @media (max-width: 768px) {
@@ -2440,10 +2434,25 @@
   //  初期化
   // ========================================
   
-  const init = async () => {
-    console.log('🌟 HIKARI People App initializing...');
-    
-    injectStyles();
+const init = async () => {
+  console.log('🌟 HIKARI People App initializing...');
+  
+  // このビューでのみ標準UIを非表示
+  if (!document.getElementById('hikari-hide-standard-ui')) {
+    const hideStyle = document.createElement('style');
+    hideStyle.id = 'hikari-hide-standard-ui';
+    hideStyle.textContent = `
+      .gaia-argoui-app-index-pager,
+      .recordlist-header-gaia,
+      .recordlist-gaia,
+      .gaia-argoui-appindex-toolbar {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(hideStyle);
+  }
+  
+  injectStyles();
     
     // フォームオプションを読み込み（業種、個人特性、接点種別）
     await Promise.all([
@@ -2453,12 +2462,15 @@
     ]);
     
     // kintoneの一覧表示領域を取得
-    const indexEl = kintone.app.getHeaderSpaceElement();
-    if (!indexEl) return;
-    
-    // コンテナ作成
-    const container = createContainer();
-    indexEl.parentElement.insertBefore(container, indexEl);
+const mountEl = document.getElementById('hikari-people-app');
+if (!mountEl) {
+  console.error('❌ hikari-people-app コンテナが見つかりません');
+  return;
+}
+
+// コンテナ作成
+const container = createContainer();
+mountEl.appendChild(container);
     
     // イベント設定
     document.getElementById('hikari-search').addEventListener('input', (e) => {
@@ -2518,9 +2530,16 @@
   //  イベント登録
   // ========================================
   
-  kintone.events.on('app.record.index.show', (event) => {
-    init();
+kintone.events.on('app.record.index.show', (event) => {
+  // 指定したカスタムビューの場合のみ実行
+  if (event.viewId !== CONFIG.VIEW_ID) {
+    // 別ビューに移動した場合、非表示スタイルを削除
+    const hideStyle = document.getElementById('hikari-hide-standard-ui');
+    if (hideStyle) hideStyle.remove();
     return event;
-  });
+  }
+  init();
+  return event;
+});
 
 })();
