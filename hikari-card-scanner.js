@@ -19,12 +19,11 @@
     
 // ■ 外部API設定
 EXTERNAL_API: {
+  // Claude API（名刺OCR + 構造化を一括処理）
+  CLAUDE_API_KEY: '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',
   
-  // Claude API
-  CLAUDE_API_KEY: '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',
-  
-  // メール送信 GAS Webhook（Zapierから移行）
-  EMAIL_WEBHOOK_URL: 'https://script.google.com/macros/s/AKfycbz99AzrDmqxqxJCmK9Sb5aJpfQaLE8LfA6srtxOdGv2Hiwq1ITGKZCMPF-MZ-g81cYQ4Q/exec',  // ← GASデプロイ後のURLに差し替え
+  // メール送信 GAS Webhook
+  EMAIL_WEBHOOK_URL: 'https://script.google.com/macros/s/AKfycbz99AzrDmqxqxJCmK9Sb5aJpfQaLE8LfA6srtxOdGv2Hiwq1ITGKZCMPF-MZ-g81cYQ4Q/exec',
 },
     
     // ■ メール送信者情報
@@ -72,9 +71,8 @@ EXTERNAL_API: {
 const TARGET_APP_ID = CONFIG.APPS.TARGET_APP_ID;
 const TEMPLATE_APP_ID = CONFIG.APPS.TEMPLATE_APP_ID;
 const FORM_VIEW_ID = CONFIG.VIEWS.FORM_VIEW_ID;
-const VISION_API_KEY = CONFIG.EXTERNAL_API.VISION_API_KEY;
 const CLAUDE_API_KEY = CONFIG.EXTERNAL_API.CLAUDE_API_KEY;
-const EMAIL_WEBHOOK_URL = CONFIG.EXTERNAL_API.EMAIL_WEBHOOK_URL;  // ← ここ！
+const EMAIL_WEBHOOK_URL = CONFIG.EXTERNAL_API.EMAIL_WEBHOOK_URL;
 const SENDER_EMAIL = CONFIG.EMAIL_SENDER.EMAIL;
 const SENDER_NAME = CONFIG.EMAIL_SENDER.NAME;
 const SENDER_COMPANY = CONFIG.EMAIL_SENDER.COMPANY;
@@ -2521,7 +2519,7 @@ const updateRelationshipSelect = () => {
           return;
         }
         
-try {
+        try {
           $processBtn.disabled = true;
           $processBtn.classList.add('loading');
           $processBtn.textContent = '処理中...';
@@ -2852,64 +2850,48 @@ try {
       return dataURL.split(',')[1];
     };
 
-    const preprocessOCRText = (rawText) => {
-      return rawText
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n')
-        .replace(/\n\s*\n/g, '\n')
-        .replace(/[ \u3000]+/g, ' ')
-        .trim()
-        .split('\n')
-        .filter(line => line.trim())
-        .join('\n');
-    };
-
-    // ========== 追加：Claude Vision APIで画像から直接抽出 ==========
-const extractBusinessCardWithClaudeVision = async (frontImageDataURL, backImageDataURL = null) => {
-  console.log('Claude Vision API呼び出し開始');
-  
-  const getBase64FromDataURL = (dataURL) => {
-    return dataURL.split(',')[1];
-  };
-  
-  const getMediaType = (dataURL) => {
-    const match = dataURL.match(/data:([^;]+);/);
-    return match ? match[1] : 'image/jpeg';
-  };
-  
-  // 画像コンテンツを構築
-  const imageContents = [];
-  
-  // 表面画像
-  imageContents.push({
-    type: 'image',
-    source: {
-      type: 'base64',
-      media_type: getMediaType(frontImageDataURL),
-      data: getBase64FromDataURL(frontImageDataURL)
-    }
-  });
-  
-  // 裏面画像がある場合
-  if (backImageDataURL) {
-    imageContents.push({
-      type: 'text',
-      text: '【裏面】'
-    });
-    imageContents.push({
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: getMediaType(backImageDataURL),
-        data: getBase64FromDataURL(backImageDataURL)
+    // ========== Claude Vision APIで画像から直接抽出 ==========
+    const extractBusinessCardWithClaudeVision = async (frontImageDataURL, backImageDataURL = null) => {
+      console.log('Claude Vision API呼び出し開始');
+      
+      const getMediaType = (dataURL) => {
+        const match = dataURL.match(/data:([^;]+);/);
+        return match ? match[1] : 'image/jpeg';
+      };
+      
+      // 画像コンテンツを構築
+      const imageContents = [];
+      
+      // 表面画像
+      imageContents.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: getMediaType(frontImageDataURL),
+          data: getBase64FromDataURL(frontImageDataURL)
+        }
+      });
+      
+      // 裏面画像がある場合
+      if (backImageDataURL) {
+        imageContents.push({
+          type: 'text',
+          text: '【裏面】'
+        });
+        imageContents.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: getMediaType(backImageDataURL),
+            data: getBase64FromDataURL(backImageDataURL)
+          }
+        });
       }
-    });
-  }
-  
-  // プロンプトを追加
-  imageContents.push({
-    type: 'text',
-    text: `この名刺画像から情報を抽出してください。
+      
+      // プロンプトを追加
+      imageContents.push({
+        type: 'text',
+        text: `この名刺画像から情報を抽出してください。
 
 === 抽出ルール ===
 ・名前：個人の氏名（組織名・役職を含まない）
@@ -2937,228 +2919,18 @@ const extractBusinessCardWithClaudeVision = async (frontImageDataURL, backImageD
   "address": "",
   "postalCode": ""
 }`
-  });
-
-  try {
-    console.log('CLAUDE_API_KEY:', CLAUDE_API_KEY ? CLAUDE_API_KEY.substring(0, 25) + '...' : '未定義');
-    const requestBody = JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
-      messages: [{
-        role: "user",
-        content: imageContents
-      }]
-    });
-
-    const response = await new Promise((resolve, reject) => {
-      kintone.proxy(
-        'https://api.anthropic.com/v1/messages',
-        'POST',
-        {
-          'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        requestBody,
-        (response, status) => {
-          console.log('Claude Vision APIレスポンスステータス:', status);
-          if (status === 200) {
-            resolve(JSON.parse(response));
-          } else {
-            console.error('Claude Vision APIエラー:', status, response);
-            reject(new Error(`Claude API Error: ${status}`));
-          }
-        }
-      );
-    });
-
-    let responseText = response.content[0].text;
-    responseText = responseText.replace(/```json\s?/g, "").replace(/```\s?/g, "").trim();
-    const extractedData = JSON.parse(responseText);
-    
-    return { success: true, data: validateAndNormalizeData(extractedData) };
-
-  } catch (error) {
-    console.error('Claude Vision API エラー:', error);
-    return { success: false, error: error.message };
-  }
-};
-// ========== 追加ここまで ==========
-
-    const callVisionAPI = async (apiKey, imageDataURL) => {
-      console.log('callVisionAPI開始');
-      const base64Image = getBase64FromDataURL(imageDataURL);
-      console.log('Base64画像サイズ:', base64Image.length, '文字');
-      
-      const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
-      console.log('APIエンドポイント:', apiUrl.replace(apiKey, 'XXX...'));
-      
-      const requestBody = {
-        requests: [{
-          image: { content: base64Image },
-          features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }]
-        }]
-      };
-      
-      try {
-        console.log('Vision API呼び出し中...');
-        const response = await new Promise((resolve, reject) => {
-          kintone.proxy(apiUrl, 'POST', {
-            'Content-Type': 'application/json'
-          }, JSON.stringify(requestBody), (response, status) => {
-            console.log('Vision APIレスポンスステータス:', status);
-            if (status === 200) {
-              console.log('Vision API成功');
-              resolve(JSON.parse(response));
-            } else {
-              console.error('Vision APIエラー:', status, response);
-              reject(new Error(`API Error: ${status}`));
-            }
-          });
-        });
-        
-        if (response.responses && response.responses[0] && response.responses[0].textAnnotations) {
-          const fullText = response.responses[0].textAnnotations[0].description;
-          return { success: true, text: fullText };
-        } else if (response.responses && response.responses[0] && response.responses[0].error) {
-          return { success: false, error: response.responses[0].error.message };
-        } else {
-          return { success: false, error: 'テキストが検出されませんでした' };
-        }
-        
-      } catch (error) {
-        return { success: false, error: error.message };
-      }
-    };
-
-    const displayOCRResults = async (rawText) => {
-      const processedText = preprocessOCRText(rawText);
-      
-      el('#extracted-name').value = 'AI分析中...';
-      el('#extracted-company').value = 'AI分析中...';
-      el('#extracted-position').value = 'AI分析中...';
-      el('#extracted-phone').value = 'AI分析中...';
-      el('#extracted-email').value = 'AI分析中...';
-      el('#extracted-website').value = 'AI分析中...';
-      el('#extracted-address').value = 'AI分析中...';
-      el('#extracted-postalcode').value = 'AI分析中...';
-      
-      try {
-        const extractedData = await extractBusinessCardInfoWithClaude(processedText);
-        
-        const normalizedName = extractedData.name ? extractedData.name.replace(/\s+/g, '') : '';
-        
-        el('#extracted-name').value = normalizedName;
-        el('#extracted-company').value = extractedData.company || '';
-        el('#extracted-position').value = extractedData.position || '';
-        el('#extracted-phone').value = extractedData.phone || '';
-        el('#extracted-email').value = extractedData.email || '';
-        el('#extracted-website').value = extractedData.website || '';
-        el('#extracted-address').value = extractedData.address || '';
-        el('#extracted-postalcode').value = extractedData.postalCode || '';
-        
-      } catch (error) {
-        const fallbackData = extractBusinessCardInfoFallback(rawText);
-        
-        el('#extracted-name').value = fallbackData.name.replace(/\s+/g, '');
-        el('#extracted-company').value = fallbackData.company;
-        el('#extracted-position').value = fallbackData.position;
-        el('#extracted-phone').value = fallbackData.phone;
-        el('#extracted-email').value = fallbackData.email;
-        el('#extracted-website').value = fallbackData.website;
-        el('#extracted-address').value = fallbackData.address;
-        el('#extracted-postalcode').value = fallbackData.postalCode;
-        
-        showExtractionFailureModal(fallbackData);
-      }
-    };
-
-    // Claude APIを使用した高精度抽出
-    const extractBusinessCardInfoWithClaude = async (processedText) => {
-      const prompt = `あなたは日本の名刺情報抽出の専門AIです。縦書き・横書き・混在レイアウトの全パターンに対応し、業界・企業規模を問わず正確な情報抽出を行ってください。
-
-=== 基本方針 ===
-・配置位置ではなく語彙・文脈・日本の商習慣から判別
-・特定企業や業界に依存しない汎用ルールで処理
-・不明な項目は推測せず空文字で返す
-・装飾語・スローガン・キャッチコピーは除外
-
-=== 日本名刺の構造理解 ===
-一般的階層：組織名→部署・支社名→個人名→役職→連絡先情報
-ただし、レイアウトは多様で順序が入れ替わることも多い
-
-=== 項目別抽出基準 ===
-
-【name】個人の氏名
-・日本人名（漢字・かな・カナ）または外国人名（アルファベット）
-・メールアドレスのローカル部分との一致を参考にする
-・組織語（支社/支店/部/課/本社/営業所/センター等）を含む文字列は除外
-・法人格（株式会社/有限会社等）を含む文字列は除外
-・役職語（部長/課長/社長/取締役等）を含む文字列は除外
-
-【company】組織の正式名称
-・法人格を含む正式名称を優先：株式会社/有限会社/合同会社/一般社団法人/一般財団法人/医療法人/学校法人/社会福祉法人/NPO法人/生命保険株式会社/損害保険株式会社/農業協同組合/信用金庫/信用組合/労働金庫/相互会社/銀行/証券/生命/海上/火災/信金/信組/農協/法律事務所/会計事務所/司法書士事務所/行政書士事務所/税理士事務所/弁理士事務所/社会保険労務士事務所/土地家屋調査士事務所/不動産鑑定士事務所/公認会計士事務所/社労士事務所/FP事務所/コンサルティング事務所/特許事務所/弁護士法人/税理士法人/司法書士法人/行政書士法人/Inc./Co.,Ltd./Corp.等
-・金融機関特有の表記も対象：○○銀行/○○証券/○○生命/○○海上/○○火災/○○信金/○○信組/○○農協/JA○○等
-・支社名・部署名単体は除外、必ず法人としての名称を抽出
-
-【position】役職・所属部署
-・個人の役職名と所属部署の組み合わせ可
-・代表取締役/部長/課長/マネージャー/エンジニア/コンサルタント/プランナー等
-・支社名も所属として含める場合あり
-
-【phone】電話番号
-・優先順位：携帯（070/080/090）→フリーダイヤル（0120/0800）→固定電話
-・形式：0で始まる10-11桁、数字とハイフンのみ
-・FAX番号・内線番号は除外
-・郵便番号（7桁）との混同を避ける
-
-【email】メールアドレス
-・@を含む完全なアドレス
-・ドメイン部分が適切な形式（.com/.co.jp/.jp/.net等）
-
-【website】ウェブサイト
-・http://、https://、www.で始まる、または適切なドメインで終わるURL
-
-【postalCode】郵便番号
-・7桁の数字（XXX-XXXX形式）
-・〒マークの有無は問わない
-・電話番号（特に0120等のフリーダイヤル）と絶対に混同しない
-
-【address】住所
-・都道府県から始まる完全住所（郵便番号部分は除く）
-・複数住所がある場合は代表住所を優先
-
-=== 重要な判別ポイント ===
-・個人名と組織名の厳密な区別
-・電話番号（0120-XXXXXX）と郵便番号（XXX-XXXX）の形式による判別
-・法人格の有無による会社名の特定
-・メールアドレスとの整合性チェック
-
-OCRテキスト:
-"""
-${processedText}
-"""
-
-以下のJSON形式のみで出力（説明・コメント一切不要）:
-{
-  "name": "",
-  "company": "",
-  "position": "",
-  "phone": "",
-  "email": "",
-  "website": "",
-  "address": "",
-  "postalCode": ""
-}`;
+      });
 
       try {
+        console.log('CLAUDE_API_KEY:', CLAUDE_API_KEY ? CLAUDE_API_KEY.substring(0, 20) + '...' : '未定義');
+        
         const requestBody = JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1500,
-          temperature: 0.02,
-          messages: [
-            { role: "user", content: prompt }
-          ]
+          messages: [{
+            role: "user",
+            content: imageContents
+          }]
         });
 
         const response = await new Promise((resolve, reject) => {
@@ -3172,10 +2944,12 @@ ${processedText}
             },
             requestBody,
             (response, status) => {
+              console.log('Claude Vision APIレスポンスステータス:', status);
               if (status === 200) {
                 resolve(JSON.parse(response));
               } else {
-                reject(new Error(`Claude API Error: ${status} - ${response}`));
+                console.error('Claude Vision APIエラー:', status, response);
+                reject(new Error(`Claude API Error: ${status}`));
               }
             }
           );
@@ -3185,12 +2959,14 @@ ${processedText}
         responseText = responseText.replace(/```json\s?/g, "").replace(/```\s?/g, "").trim();
         const extractedData = JSON.parse(responseText);
         
-        return validateAndNormalizeData(extractedData);
+        return { success: true, data: validateAndNormalizeData(extractedData) };
 
       } catch (error) {
-        throw error;
+        console.error('Claude Vision API エラー:', error);
+        return { success: false, error: error.message };
       }
     };
+
 
     // データ検証・正規化関数
     const validateAndNormalizeData = (data) => {
@@ -3262,90 +3038,6 @@ ${processedText}
         result.address = data.address.replace(/^〒?\s?\d{3}-?\d{4}\s*/, '').trim();
       }
 
-      return result;
-    };
-
-    // フォールバック用の基本抽出
-    const extractBusinessCardInfoFallback = (text) => {
-      const result = { 
-        name: '', 
-        company: '', 
-        position: '', 
-        phone: '', 
-        email: '', 
-        website: '', 
-        address: '', 
-        postalCode: '' 
-      };
-      
-      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-      const emailMatch = text.match(emailRegex);
-      if (emailMatch) {
-        result.email = emailMatch[0];
-      }
-      
-      const phoneRegex = /(?:\d{2,4}[-\s]?\d{2,4}[-\s]?\d{4}|\d{3}[-\s]?\d{4}[-\s]?\d{4})/g;
-      const phoneMatches = text.match(phoneRegex);
-      if (phoneMatches) {
-        const mobilePatterns = [
-          /0[789]0[-\s]?\d{4}[-\s]?\d{4}/,
-          /0[789]0\d{8}/
-        ];
-        
-        let mobilePhone = null;
-        for (let pattern of mobilePatterns) {
-          const mobileMatch = text.match(pattern);
-          if (mobileMatch) {
-            mobilePhone = mobileMatch[0].replace(/\s/g, '');
-            break;
-          }
-        }
-        
-        result.phone = mobilePhone || phoneMatches[0].replace(/\s/g, '');
-      }
-      
-      const urlRegex = /https?:\/\/[^\s]+/g;
-      const urlMatch = text.match(urlRegex);
-      if (urlMatch) {
-        result.website = urlMatch[0];
-      }
-      
-      const postalRegex = /〒?\s?(\d{3}-?\d{4})/g;
-      const postalMatch = text.match(postalRegex);
-      if (postalMatch) {
-        result.postalCode = postalMatch[0].replace(/〒\s?/, '');
-      }
-      
-      const companyRegex = /(株式会社|有限会社|合同会社|合名会社|合資会社|一般社団法人|一般財団法人|医療法人|学校法人|社会福祉法人|NPO法人|生命保険株式会社|損害保険株式会社|農業協同組合|信用金庫|信用組合|労働金庫|相互会社|銀行|証券|生命|海上|火災|信金|信組|農協|法律事務所|会計事務所|司法書士事務所|行政書士事務所|税理士事務所|弁理士事務所|社会保険労務士事務所|土地家屋調査士事務所|不動産鑑定士事務所|公認会計士事務所|社労士事務所|FP事務所|コンサルティング事務所|特許事務所|弁護士法人|税理士法人|司法書士法人|行政書士法人|Inc\.?|Co\.?,?\s*Ltd\.?|Corp\.?|LLC)[^\n\r]+/g;
-      const companyMatch = text.match(companyRegex);
-      if (companyMatch) {
-        result.company = companyMatch[0].trim();
-      }
-      
-      const positionRegex = /(代表取締役|取締役|専務|常務|部長|課長|主任|係長|社長|副社長|CEO|CTO|CFO|代表|作曲家|デザイナー|エンジニア|マネージャー)/g;
-      const positionMatch = text.match(positionRegex);
-      if (positionMatch) {
-        result.position = positionMatch.join('・');
-      }
-      
-      const lines = text.split('\n').filter(line => line.trim());
-      for (let line of lines) {
-        const trimmed = line.trim();
-        if (/^[ぁ-んァ-ヶ一-龯\s]{2,8}$/.test(trimmed) && 
-            !trimmed.includes('株式会社') &&
-            !trimmed.includes('有限会社') &&
-            !trimmed.includes('会社') &&
-            !trimmed.includes('部長') &&
-            !trimmed.includes('課長') &&
-            !trimmed.includes('代表') &&
-            !trimmed.includes('取締役') &&
-            !/@/.test(trimmed) &&
-            !/\d/.test(trimmed)) {
-          result.name = trimmed.replace(/\s+/g, '');
-          break;
-        }
-      }
-      
       return result;
     };
 
