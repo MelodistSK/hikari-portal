@@ -2956,7 +2956,11 @@ const updateRelationshipSelect = () => {
       el('#extracted-postalcode').value = 'AI分析中...';
       
       try {
+        console.log('=== Claude API呼び出し開始 ===');
+        console.log('CLAUDE_API_KEY:', CLAUDE_API_KEY ? CLAUDE_API_KEY.substring(0, 20) + '...' : '未定義');
         const extractedData = await extractBusinessCardInfoWithClaude(processedText);
+        console.log('=== Claude API成功 ===');
+        console.log('抽出データ:', extractedData);
         
         const normalizedName = extractedData.name ? extractedData.name.replace(/\s+/g, '') : '';
         
@@ -2970,6 +2974,8 @@ const updateRelationshipSelect = () => {
         el('#extracted-postalcode').value = extractedData.postalCode || '';
         
       } catch (error) {
+        console.error('=== Claude API失敗、フォールバック実行 ===');
+        console.error('エラー:', error.message);
         const fallbackData = extractBusinessCardInfoFallback(rawText);
         
         el('#extracted-name').value = fallbackData.name.replace(/\s+/g, '');
@@ -3073,6 +3079,7 @@ ${processedText}
           ]
         });
 
+        console.log('Claude API リクエスト送信中...');
         const response = await new Promise((resolve, reject) => {
           kintone.proxy(
             'https://api.anthropic.com/v1/messages',
@@ -3084,9 +3091,12 @@ ${processedText}
             },
             requestBody,
             (response, status) => {
+              console.log('Claude API レスポンスステータス:', status);
               if (status === 200) {
+                console.log('Claude API 成功レスポンス受信');
                 resolve(JSON.parse(response));
               } else {
+                console.error('Claude API エラーレスポンス:', response);
                 reject(new Error(`Claude API Error: ${status} - ${response}`));
               }
             }
