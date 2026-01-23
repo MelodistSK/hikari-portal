@@ -20,7 +20,7 @@
 // ■ 外部API設定
 EXTERNAL_API: {
   // Claude API（名刺OCR + 構造化を一括処理）
-  CLAUDE_API_KEY: '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',
+  CLAUDE_API_KEY: 'sk-ant-api03-xxxxx',
   
   // メール送信 GAS Webhook
   EMAIL_WEBHOOK_URL: 'https://script.google.com/macros/s/AKfycbz99AzrDmqxqxJCmK9Sb5aJpfQaLE8LfA6srtxOdGv2Hiwq1ITGKZCMPF-MZ-g81cYQ4Q/exec',
