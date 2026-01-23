@@ -19,8 +19,6 @@
     
 // ■ 外部API設定
 EXTERNAL_API: {
-  // Google Vision API
-  VISION_API_KEY: 'AIzaSyDvSBi6S_WOwB5QEWU1DB0uPIzIw_EqZMQ',
   
   // Claude API
   CLAUDE_API_KEY: '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',
@@ -2523,7 +2521,7 @@ const updateRelationshipSelect = () => {
           return;
         }
         
-        try {
+try {
           $processBtn.disabled = true;
           $processBtn.classList.add('loading');
           $processBtn.textContent = '処理中...';
@@ -2531,33 +2529,26 @@ const updateRelationshipSelect = () => {
           // 処理オーバーレイを表示
           el('#processing-overlay').style.display = 'flex';
           
-          console.log('Vision API呼び出し開始（表面）');
-          console.log('APIキー:', VISION_API_KEY ? `${VISION_API_KEY.substring(0, 10)}...` : '未設定');
+          console.log('Claude Vision API呼び出し開始');
           
-          // 表面のOCR処理
-          const ocrResult = await callVisionAPI(VISION_API_KEY, selectedCardImage);
-          console.log('表面OCR結果:', ocrResult);
+          // Claude APIで画像から直接抽出
+          const result = await extractBusinessCardWithClaudeVision(
+            selectedCardImage,
+            selectedCardImageBack
+          );
+          console.log('Claude Vision結果:', result);
           
-          // 裏面がある場合は裏面もOCR処理
-          let backOcrResult = null;
-          if (selectedCardImageBack) {
-            console.log('Vision API呼び出し開始（裏面）');
-            backOcrResult = await callVisionAPI(VISION_API_KEY, selectedCardImageBack);
-            console.log('裏面OCR結果:', backOcrResult);
-          }
-          
-          // OCR結果を結合
-          let combinedText = '';
-          if (ocrResult.success) {
-            combinedText = ocrResult.text;
-            if (backOcrResult && backOcrResult.success) {
-              combinedText += '\n\n[裏面]\n' + backOcrResult.text;
-            }
-          }
-          console.log('結合されたテキスト:', combinedText ? `${combinedText.substring(0, 100)}...` : '空');
-          
-          if (ocrResult.success) {
-            await displayOCRResults(combinedText);
+          if (result.success) {
+            // 抽出結果をフォームに反映
+            const data = result.data;
+            el('#extracted-name').value = data.name || '';
+            el('#extracted-company').value = data.company || '';
+            el('#extracted-position').value = data.position || '';
+            el('#extracted-phone').value = data.phone || '';
+            el('#extracted-email').value = data.email || '';
+            el('#extracted-website').value = data.website || '';
+            el('#extracted-address').value = data.address || '';
+            el('#extracted-postalcode').value = data.postalCode || '';
             
             // 処理オーバーレイを非表示
             el('#processing-overlay').style.display = 'none';
@@ -2567,14 +2558,14 @@ const updateRelationshipSelect = () => {
             }, 1000);
             
             extractedContactData = {
-              name: el('#extracted-name').value || '',
-              company: el('#extracted-company').value || '',
-              position: el('#extracted-position').value || '',
-              phone: el('#extracted-phone').value || '',
-              email: el('#extracted-email').value || '',
-              website: el('#extracted-website').value || '',
-              address: el('#extracted-address').value || '',
-              postalCode: el('#extracted-postalcode').value || '',
+              name: data.name || '',
+              company: data.company || '',
+              position: data.position || '',
+              phone: data.phone || '',
+              email: data.email || '',
+              website: data.website || '',
+              address: data.address || '',
+              postalCode: data.postalCode || '',
               birthday: el('#extracted-birthday').value || '',
               industry: el('#extracted-industry').value || '',
               sender_name: SENDER_NAME,
@@ -2584,7 +2575,7 @@ const updateRelationshipSelect = () => {
             await checkDuplicateName();
             
           } else {
-            showBusinessCardAlert('OCRエラー', 'OCR処理に失敗しました: ' + ocrResult.error);
+            showBusinessCardAlert('抽出エラー', '名刺情報の抽出に失敗しました: ' + result.error);
             resetToUploadScreen();
           }
           
@@ -2872,6 +2863,126 @@ const updateRelationshipSelect = () => {
         .filter(line => line.trim())
         .join('\n');
     };
+
+    // ========== 追加：Claude Vision APIで画像から直接抽出 ==========
+const extractBusinessCardWithClaudeVision = async (frontImageDataURL, backImageDataURL = null) => {
+  console.log('Claude Vision API呼び出し開始');
+  
+  const getBase64FromDataURL = (dataURL) => {
+    return dataURL.split(',')[1];
+  };
+  
+  const getMediaType = (dataURL) => {
+    const match = dataURL.match(/data:([^;]+);/);
+    return match ? match[1] : 'image/jpeg';
+  };
+  
+  // 画像コンテンツを構築
+  const imageContents = [];
+  
+  // 表面画像
+  imageContents.push({
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: getMediaType(frontImageDataURL),
+      data: getBase64FromDataURL(frontImageDataURL)
+    }
+  });
+  
+  // 裏面画像がある場合
+  if (backImageDataURL) {
+    imageContents.push({
+      type: 'text',
+      text: '【裏面】'
+    });
+    imageContents.push({
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: getMediaType(backImageDataURL),
+        data: getBase64FromDataURL(backImageDataURL)
+      }
+    });
+  }
+  
+  // プロンプトを追加
+  imageContents.push({
+    type: 'text',
+    text: `この名刺画像から情報を抽出してください。
+
+=== 抽出ルール ===
+・名前：個人の氏名（組織名・役職を含まない）
+・会社名：法人格を含む正式名称（株式会社○○、○○銀行など）
+・役職：役職名と所属部署
+・電話番号：携帯優先（070/080/090）、次にフリーダイヤル、固定電話
+・メールアドレス：@を含む完全なアドレス
+・ウェブサイト：URL
+・郵便番号：7桁（XXX-XXXX形式）※電話番号と混同しない
+・住所：都道府県から始まる住所（郵便番号部分は除く）
+
+=== 注意 ===
+・読み取れない項目は空文字
+・推測しない
+・電話番号と郵便番号を絶対に混同しない（電話は0始まり10-11桁、郵便は3桁-4桁）
+
+以下のJSON形式のみで出力:
+{
+  "name": "",
+  "company": "",
+  "position": "",
+  "phone": "",
+  "email": "",
+  "website": "",
+  "address": "",
+  "postalCode": ""
+}`
+  });
+
+  try {
+    const requestBody = JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1500,
+      messages: [{
+        role: "user",
+        content: imageContents
+      }]
+    });
+
+    const response = await new Promise((resolve, reject) => {
+      kintone.proxy(
+        'https://api.anthropic.com/v1/messages',
+        'POST',
+        {
+          'Content-Type': 'application/json',
+          'x-api-key': CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        requestBody,
+        (response, status) => {
+          console.log('Claude Vision APIレスポンスステータス:', status);
+          if (status === 200) {
+            resolve(JSON.parse(response));
+          } else {
+            console.error('Claude Vision APIエラー:', status, response);
+            reject(new Error(`Claude API Error: ${status}`));
+          }
+        }
+      );
+    });
+
+    let responseText = response.content[0].text;
+    responseText = responseText.replace(/```json\s?/g, "").replace(/```\s?/g, "").trim();
+    const extractedData = JSON.parse(responseText);
+    
+    return { success: true, data: validateAndNormalizeData(extractedData) };
+
+  } catch (error) {
+    console.error('Claude Vision API エラー:', error);
+    return { success: false, error: error.message };
+  }
+};
+// ========== 追加ここまで ==========
 
     const callVisionAPI = async (apiKey, imageDataURL) => {
       console.log('callVisionAPI開始');
