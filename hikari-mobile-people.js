@@ -252,62 +252,22 @@
     style.id = 'hmp-styles';
     style.textContent = `
     /* ========================================
-       kintone標準UI非表示（超強化版）
+       kintone標準UI非表示（CSS版・安全）
        ======================================== */
-    /* ビュータブ・ページャー */
     .gaia-mobile-v2-viewpanel-viewtab,
     .gaia-mobile-v2-viewpanel-pager,
     .gaia-mobile-v2-viewpanel-viewlist,
-    .gaia-mobile-v2-app-index-pager,
-    .gaia-mobile-v2-app-pager,
-    
-    /* レコード一覧 */
     .gaia-mobile-v2-viewpanel-recordlist,
-    .gaia-mobile-v2-recordlist,
-    .gaia-mobile-v2-view-list-record,
-    .recordlist-gaia,
-    .recordlist-wrapper-gaia,
-    .gaia-mobile-v2-record-single-show,
-    .gaia-mobile-v2-app-record-viewtab-container,
-    
-    /* ツールバー・追加ボタン */
+    .gaia-mobile-v2-app-index-pager,
     .gaia-mobile-v2-app-index-toolbar,
     .gaia-mobile-v2-app-index-addbutton,
-    .gaia-mobile-v2-app-addbutton,
-    .gaia-mobile-v2-app-toolbar-gaia,
-    .gaia-mobile-v2-buttonarea,
-    
-    /* インデックス画面 */
-    .gaia-mobile-v2-app-index-view,
-    .gaia-mobile-v2-app-indexHeader,
-    .gaia-mobile-v2-messagepanel,
-    
-    /* 追加：テーブル関連 */
-    .recordlist-cell-gaia,
-    .recordlist-header-gaia,
-    .recordlist-row-gaia,
-    .gaia-mobile-v2-viewpanel,
-    .gaia-mobile-v2-app-index-recordlist,
-    
-    /* 追加：FAB（フローティングボタン） */
     .gaia-mobile-v2-floating-button,
-    .gaia-mobile-v2-fab,
-    [class*="gaia-mobile"][class*="addbutton"],
-    [class*="gaia-mobile"][class*="recordlist"],
-    [class*="gaia-mobile"][class*="viewpanel"],
-    
-    /* 一覧コンテンツ全体 */
-    .gaia-mobile-v2-app-index-contents,
-    .gaia-mobile-v2-viewpanel-contents {
+    .recordlist-gaia,
+    .recordlist-wrapper-gaia {
       display: none !important;
       visibility: hidden !important;
       height: 0 !important;
-      max-height: 0 !important;
       overflow: hidden !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-      position: absolute !important;
-      left: -9999px !important;
     }
     
     /* ========================================
@@ -1422,6 +1382,25 @@
   };
 
   // ========================================
+  //  kintone標準UI非表示（安全版）
+  // ========================================
+  
+  const hideKintoneUI = () => {
+    // ヘッダースペースの後の兄弟要素のみ非表示（シンプルで安全）
+    const headerSpace = kintone.mobile.app.getHeaderSpaceElement();
+    if (headerSpace) {
+      let sibling = headerSpace.nextElementSibling;
+      while (sibling) {
+        // hmp-containerを含まない要素のみ非表示
+        if (!sibling.querySelector('.hmp-container')) {
+          sibling.style.cssText = 'display:none!important;';
+        }
+        sibling = sibling.nextElementSibling;
+      }
+    }
+  };
+
+  // ========================================
   //  一覧画面描画
   // ========================================
   
@@ -1530,7 +1509,7 @@
       }
     });
     
-    // kintone標準UIを非表示（描画後に再実行）
+    // kintone標準UIを非表示
     setTimeout(hideKintoneUI, 50);
   };
 
@@ -1590,7 +1569,6 @@
       renderList();
     });
     
-    // kintone標準UIを非表示
     setTimeout(hideKintoneUI, 50);
   };
 
@@ -1842,7 +1820,6 @@
       });
     }
     
-    // kintone標準UIを非表示
     setTimeout(hideKintoneUI, 50);
   };
 
@@ -1885,7 +1862,6 @@
     document.getElementById('hmp-back').addEventListener('click', () => renderDetail(record));
     document.getElementById('hmp-save').addEventListener('click', () => saveContact());
     
-    // kintone標準UIを非表示
     setTimeout(hideKintoneUI, 50);
   };
 
@@ -2322,7 +2298,6 @@
       document.getElementById('hmp-delete').addEventListener('click', () => deleteRecord());
     }
     
-    // kintone標準UIを非表示
     setTimeout(hideKintoneUI, 50);
   };
 
@@ -2449,136 +2424,20 @@
   };
 
   // ========================================
-  //  kintone標準UI非表示（JavaScript版・超強化）
-  // ========================================
-  
-  const hideKintoneUI = () => {
-    const hideStyle = 'display:none!important;visibility:hidden!important;height:0!important;max-height:0!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;position:absolute!important;left:-9999px!important;';
-    
-    // 方法1: クラス名ベースで非表示
-    const selectors = [
-      // viewpanel関連
-      '.gaia-mobile-v2-viewpanel',
-      '.gaia-mobile-v2-viewpanel-recordlist',
-      '.gaia-mobile-v2-viewpanel-contents',
-      '.gaia-mobile-v2-viewpanel-viewlist',
-      // app-index関連
-      '.gaia-mobile-v2-app-index-contents',
-      '.gaia-mobile-v2-app-index-toolbar',
-      '.gaia-mobile-v2-app-index-addbutton',
-      '.gaia-mobile-v2-app-index-recordlist',
-      // recordlist関連
-      '.recordlist-gaia',
-      '.recordlist-wrapper-gaia',
-      '.gaia-mobile-v2-recordlist',
-      // フローティングボタン
-      '.gaia-mobile-v2-floating-button',
-      '.gaia-mobile-v2-fab',
-      // 部分一致
-      '[class*="recordlist"]',
-      '[class*="viewpanel"]',
-      '[class*="floating-button"]',
-      '[class*="fab"]',
-    ];
-    
-    selectors.forEach(selector => {
-      try {
-        document.querySelectorAll(selector).forEach(el => {
-          el.style.cssText = hideStyle;
-        });
-      } catch (e) {}
-    });
-    
-    // 方法2: ヘッダースペースの兄弟・親の兄弟を非表示
-    const headerSpace = kintone.mobile.app.getHeaderSpaceElement();
-    if (headerSpace) {
-      // 親要素内の兄弟
-      if (headerSpace.parentElement) {
-        Array.from(headerSpace.parentElement.children).forEach(child => {
-          if (child !== headerSpace && !child.querySelector('.hmp-container')) {
-            child.style.cssText = hideStyle;
-          }
-        });
-        
-        // 親の親要素内の兄弟も非表示
-        const grandParent = headerSpace.parentElement.parentElement;
-        if (grandParent) {
-          Array.from(grandParent.children).forEach(child => {
-            if (child !== headerSpace.parentElement && !child.contains(headerSpace)) {
-              child.style.cssText = hideStyle;
-            }
-          });
-        }
-      }
-    }
-    
-    // 方法3: position:fixed の要素を非表示（FABボタン対策）
-    document.querySelectorAll('*').forEach(el => {
-      const style = window.getComputedStyle(el);
-      if (style.position === 'fixed' && !el.classList.contains('hmp-photo-modal')) {
-        // kintone関連の要素のみ非表示
-        if (el.className && (
-          el.className.includes('gaia') || 
-          el.className.includes('kintone') ||
-          el.className.includes('add') ||
-          el.className.includes('fab') ||
-          el.className.includes('floating')
-        )) {
-          el.style.cssText = hideStyle;
-        }
-      }
-    });
-    
-    // 方法4: テーブル要素を直接非表示
-    document.querySelectorAll('table').forEach(table => {
-      // kintoneのレコード一覧テーブルっぽいものを非表示
-      if (table.closest('[class*="gaia"]') || table.closest('[class*="recordlist"]')) {
-        table.style.cssText = hideStyle;
-      }
-    });
-    
-    // 方法5: 特定のテキストを含む要素を非表示
-    document.querySelectorAll('th, td').forEach(cell => {
-      if (cell.textContent === 'レコード番号' || cell.textContent === '氏名' || cell.textContent === '会社名') {
-        const table = cell.closest('table');
-        if (table) table.style.cssText = hideStyle;
-        const container = cell.closest('[class*="gaia"]');
-        if (container) container.style.cssText = hideStyle;
-      }
-    });
-    
-    // 方法6: 追加ボタン（アイコン＋テキスト）を非表示
-    document.querySelectorAll('button, a, div').forEach(el => {
-      if (el.textContent && el.textContent.trim() === '追加') {
-        if (!el.closest('.hmp-container')) {
-          el.style.cssText = hideStyle;
-          if (el.parentElement) el.parentElement.style.cssText = hideStyle;
-        }
-      }
-    });
-  };
-
-  // ========================================
   //  初期化
   // ========================================
   
   const init = async (el) => {
-    console.log('🌟 HIKARI Mobile People v10 initializing...');
+    console.log('🌟 HIKARI Mobile People v10.1 initializing...');
     
     injectStyles();
     
-    // kintone標準UIを即座に非表示
+    // kintone標準UIを非表示
     hideKintoneUI();
     
-    // 遅延読み込みされる要素も非表示にするため、定期実行（より頻繁に、より長く）
-    const hideInterval = setInterval(hideKintoneUI, 50);
-    setTimeout(() => {
-      clearInterval(hideInterval);
-      // 終了後も少し間隔を空けて実行
-      setTimeout(hideKintoneUI, 500);
-      setTimeout(hideKintoneUI, 1000);
-      setTimeout(hideKintoneUI, 2000);
-    }, 5000); // 5秒間継続
+    // 遅延読み込みされる要素も非表示にするため定期実行
+    const hideInterval = setInterval(hideKintoneUI, 100);
+    setTimeout(() => clearInterval(hideInterval), 3000);
     
     container = el;
     
@@ -2608,7 +2467,7 @@
       
       renderList();
       
-      console.log('✅ HIKARI Mobile People v10 initialized');
+      console.log('✅ HIKARI Mobile People v10.1 initialized');
       
     } catch (e) {
       console.error('❌ 初期化エラー:', e);
@@ -2636,6 +2495,6 @@
     return event;
   });
   
-  console.log('🌟 HIKARI Mobile People v10 script loaded');
+  console.log('🌟 HIKARI Mobile People v10.1 script loaded');
 
 })();
