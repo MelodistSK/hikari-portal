@@ -23,7 +23,7 @@ EXTERNAL_API: {
   VISION_API_KEY: 'AIzaSyDvSBi6S_WOwB5QEWU1DB0uPIzIw_EqZMQ',
   
   // Claude API
-  CLAUDE_API_KEY: 'sk-ant-api03-xxxxx',
+  CLAUDE_API_KEY: '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',
   
   // メール送信 GAS Webhook（Zapierから移行）
   EMAIL_WEBHOOK_URL: 'https://script.google.com/macros/s/AKfycbz99AzrDmqxqxJCmK9Sb5aJpfQaLE8LfA6srtxOdGv2Hiwq1ITGKZCMPF-MZ-g81cYQ4Q/exec',  // ← GASデプロイ後のURLに差し替え
@@ -3520,3 +3520,4 @@ ${processedText}
     render(mount);
   });
 })();
+
