@@ -155,6 +155,30 @@ const sendEmailViaGAS = async (to, subject, body) => {
   }
 };
 
+  // 名刺専用のアラート表示（グローバルスコープ）
+  function showBusinessCardAlert(title, message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-icon">💼</div>
+        <div class="modal-title">${title}</div>
+        <div class="modal-message">${message}</div>
+        <div class="modal-button-container center">
+          <button class="modal-button primary single">OK</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const closeModal = () => modal.remove();
+    modal.querySelector('.modal-button').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
   // 抽出失敗項目チェック用モーダル表示
   function showExtractionFailureModal(extractedData) {
     const failedFields = [];
