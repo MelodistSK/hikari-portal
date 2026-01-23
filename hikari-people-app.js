@@ -14,7 +14,6 @@
   APP_ID: 6,
   VIEW_ID: 6532674,
   FIELDS: {
-    FIELDS: {
       NAME: 'name',
       KANA_NAME: 'kananame',
       COMPANY: 'ルックアップ',
